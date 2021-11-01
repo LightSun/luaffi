@@ -865,7 +865,8 @@ int loadlib(lua_State *L)
         /* 4:name 5:cif 6:(cfunc|true|nil 7:err1 err2) */
         if (lua_isnil(L, 6)) {
             lua_settop(L, 7);
-            return lua_error(L);
+            return luaL_error(L, "cannot find '%s'",
+                lua_tostring(L, 4));
         }
         if (!lua_iscfunction(L, 6)) {
             return luaL_error(L, "cannot load '%s'",
