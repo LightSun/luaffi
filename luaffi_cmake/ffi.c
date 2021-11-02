@@ -851,6 +851,7 @@ int loadlib(lua_State *L)
     }
     lua_replace(L, -2);  /* 3: package.loadlib */
     lua_pushnil(L);
+    //luaB_dumpStack(L); //-- str,tab,func
     while (lua_next(L, 2) != 0) {
         /* 4: key;  5: value */
         if (lua_type(L, 4) != LUA_TSTRING ||
@@ -858,15 +859,21 @@ int loadlib(lua_State *L)
             lua_pop(L, 1);
             continue;
         }
+        printf("-- after next --    ");
+        luaB_dumpStack(L);
         lua_pushvalue(L, 3);
         lua_pushvalue(L, 1);
         lua_pushvalue(L, 4);
+        printf("-- before call method(loadlib) --    ");
+        luaB_dumpStack(L);
         lua_call(L, 2, LUA_MULTRET);  /* package.loadlib(libname, key) */
+        printf("-- after call method(loadlib) --    ");
+        luaB_dumpStack(L);
         /* 4:name 5:cif 6:(cfunc|true|nil 7:err1 err2) */
         if (lua_isnil(L, 6)) {
             lua_settop(L, 7);
-            return luaL_error(L, "cannot find '%s'",
-                lua_tostring(L, 4));
+            return luaL_error(L, "cannot find '%s' in '%s'",
+                lua_tostring(L, 4), lua_tostring(L, 1));
         }
         if (!lua_iscfunction(L, 6)) {
             return luaL_error(L, "cannot load '%s'",

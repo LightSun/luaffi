@@ -393,7 +393,10 @@ static int lookforfunc (lua_State *L, const char *path, const char *sym) {
 static int ll_loadlib (lua_State *L) {
   const char *path = luaL_checkstring(L, 1);
   const char *init = luaL_checkstring(L, 2);
+  //printf("ll_loadlib: path = %s\n", path);
+  //printf("ll_loadlib: init = %s\n", init);
   int stat = lookforfunc(L, path, init);
+  //printf("ll_loadlib: stat = %d\n", stat);
   if (stat == 0)  /* no errors? */
     return 1;  /* return the loaded function */
   else {  /* error; error message is on stack top */

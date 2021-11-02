@@ -6,7 +6,7 @@ project(luaPro LANGUAGES C)
 IF(MSVC)
 SET(FLAGS "/0x -DLUA_COMPAT_5_2")
 ELSE(MSVC)
-SET(FLAGS "-O2 -std=c99 -Wall -Wextra -DLUA_COMPAT_5_2")
+SET(FLAGS "-O2 -std=c99 -Wall -Wextra -DLUA_COMPAT_5_2 -g")
 ENDIF(MSVC)
 set(CMAKE_C_FLAGS ${FLAGS})
 set(CMAKE_C_FLAGS_DEBUG ${FLAGS})
@@ -14,7 +14,7 @@ set(CMAKE_C_FLAGS_RELEASE ${FLAGS})
 
 INCLUDE_DIRECTORIES(src)
 add_library(lua
-    SHARED
+    STATIC
     src/lapi.c
     src/lauxlib.c
     src/lbaselib.c

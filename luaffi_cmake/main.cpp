@@ -6,6 +6,9 @@ extern "C"{
 #include "lualib.h"
 #include "lauxlib.h"
 #include "ffi2.h"
+
+void testCall();
+void testCall2();
 }
 
 #define CALL_LUA(L, func)\
@@ -33,6 +36,9 @@ LUALIB_API void luaL_openlibs2(lua_State *L, const luaL_Reg funcs[]) {
 extern "C" int main()
 {
     //cout << "Hello World!" << endl;
+    testCall();
+    testCall2();
+
     lua_State * L = luaL_newstate();
     luaL_openlibs(L);
     luaL_openlibs2(L, funcs);
