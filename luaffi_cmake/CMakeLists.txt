@@ -12,6 +12,7 @@ include_directories(lua-5.3.6/src)
 add_library(ffi2 STATIC ffi2.h ffi.c ffi_ext.c)
 add_executable(luaffi_app
     ffi_def.h
+    ffi_impl.c
     libffi_study.c
     main.cpp
     )
