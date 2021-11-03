@@ -10,9 +10,14 @@ add_subdirectory(lua-5.3.6)
 include_directories(lua-5.3.6/src)
 
 add_library(ffi2 STATIC ffi2.h ffi.c ffi_ext.c)
+
+# USE_C11_ATOMICS,USE_MSC_ATOMICS,USE_GCC_ATOMICS,USE_PTHREAD_ATOMICS
 add_executable(luaffi_app
-    ffi_def.h
-    ffi_impl.c
+    atomic.h
+    atomic.c
+    hffi.h
+    hffi.c
+    hffi_test.c
     libffi_study.c
     main.cpp
     )

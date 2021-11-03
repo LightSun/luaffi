@@ -9,6 +9,8 @@ extern "C"{
 
 void testCall();
 void testCall2();
+void hffi_test1();
+void hffi_test2();
 }
 
 #define CALL_LUA(L, func)\
@@ -38,6 +40,8 @@ extern "C" int main()
     //cout << "Hello World!" << endl;
     testCall();
     testCall2();
+    hffi_test1();
+    hffi_test2();
 
     lua_State * L = luaL_newstate();
     luaL_openlibs(L);

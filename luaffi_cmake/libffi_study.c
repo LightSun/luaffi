@@ -20,9 +20,6 @@ int testFunc2(int** m, int n){
     *m = arr;
     return n;
 }
-void testClosure(){
-
-}
 void testCall2(){
     void* functionPtr = &testFunc2;
     int argCount = 2;
