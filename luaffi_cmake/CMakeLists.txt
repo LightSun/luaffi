@@ -24,3 +24,4 @@ add_executable(luaffi_app
 
 target_link_libraries(ffi2 lua ffi)
 target_link_libraries(luaffi_app ffi2 lua)
+target_compile_definitions(luaffi_app PRIVATE STRUCT_MAX_MEMBER=16)

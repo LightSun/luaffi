@@ -9,6 +9,7 @@ extern "C"{
 
 void testCall();
 void testCall2();
+void testClosure();
 void hffi_test1();
 void hffi_test2();
 }
@@ -40,6 +41,7 @@ extern "C" int main()
     //cout << "Hello World!" << endl;
     testCall();
     testCall2();
+    testClosure();
     hffi_test1();
     hffi_test2();
 

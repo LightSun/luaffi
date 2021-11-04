@@ -74,13 +74,13 @@ int hffi_type_size(hffi_type* t){
     ffi_type* ft = to_ffi_type(t->base_ffi_type, NULL);
     return ft ? ft->size : 0;
 }
-void hffi_free_type(hffi_type* t){
+void hffi_delete_type(hffi_type* t){
     int old = atomic_add(&t->ref, -1);
     if(old == 1){
         free(t);
     }
 }
-
+//------------------------- value ------------------------
 hffi_value* hffi_new_value_ptr(hffi_type* type){
     if(type->base_ffi_type != FFI_TYPE_POINTER) return NULL;
 #define INIT_MEM(t, s)\
@@ -148,21 +148,27 @@ void hffi_delete_value(hffi_value* val){
         if(val->ptr !=NULL){
             free(val->ptr);
         }
-        hffi_free_type(val->type);
+        hffi_delete_type(val->type);
         free(val);
     }
 }
+
+//----------------------------- ------------------------------
 int hffi_call(void (*fn)(void), hffi_value** in, int in_count,hffi_value* out, char** msg){
     //param types with values
-    ffi_type ** argTypes = alloca(sizeof(ffi_type *) *in_count);
-    void **args = alloca(sizeof(void *) *in_count);
-    for(int i = 0 ; i < in_count ; i ++){
-        argTypes[i] = to_ffi_type(in[i]->type->base_ffi_type, msg);
-        if(argTypes[i] == NULL){
-            return 1;
+    ffi_type ** argTypes = NULL;
+    void **args = NULL;
+    if(in_count > 0){
+        argTypes = alloca(sizeof(ffi_type *) *in_count);
+        args = alloca(sizeof(void *) *in_count);
+        for(int i = 0 ; i < in_count ; i ++){
+            argTypes[i] = to_ffi_type(in[i]->type->base_ffi_type, msg);
+            if(argTypes[i] == NULL){
+                return 1;
+            }
+            //cast param value
+            args[i] = in[i]->type->base_ffi_type == FFI_TYPE_POINTER ? &in[i]->ptr : in[i]->ptr;
         }
-        //cast param value
-        args[i] = in[i]->type->base_ffi_type == FFI_TYPE_POINTER ? &in[i]->ptr : in[i]->ptr;
     }
     //prepare call
     ffi_cif cif;
@@ -178,11 +184,117 @@ int hffi_call(void (*fn)(void), hffi_value** in, int in_count,hffi_value* out, c
     }break;
 
     case FFI_BAD_ABI:
-        strcpy(*msg, "FFI_BAD_ABI");
+        if(msg){
+            strcpy(*msg, "FFI_BAD_ABI");
+        }
         break;
     case FFI_BAD_TYPEDEF:
-        strcpy(*msg, "FFI_BAD_TYPEDEF");
+        if(msg){
+            strcpy(*msg, "FFI_BAD_TYPEDEF");
+        }
         break;
     }
     return 1;
 }
+
+//----------------------------------------------------------
+hffi_closure* hffi_new_closure(void* func_ptr, void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
+                               sint8* in, int in_count, sint8 return_t, void* ud, char** msg){
+    hffi_closure* ptr = malloc(sizeof(hffi_closure));
+    ptr->ref = 1;
+    ptr->code = &func_ptr;
+    ptr->param_count = in_count;
+    ptr->return_type = return_t;
+    for(int i = 0 ; i < in_count ; i ++){
+       ptr->param_types[i] = in[i];
+    }
+    //create closure, prepare
+    ptr->closure = ffi_closure_alloc(sizeof(ffi_closure), &func_ptr);
+    if(ptr->closure == NULL){
+        if(msg){
+            strcpy(*msg, "create closure failed!");
+        }
+        return NULL;
+    }
+
+    //param
+    ffi_type ** argTypes = NULL;
+    if(in_count > 0){
+        argTypes = alloca(sizeof(ffi_type *) *in_count);
+        for(int i = 0 ; i < in_count ; i ++){
+            argTypes[i] = to_ffi_type(in[i], msg);
+            if(argTypes[i] == NULL){
+                return NULL;
+            }
+        }
+    }
+    //return type
+    ffi_type *return_type = to_ffi_type(return_t, msg);
+    if(return_type == NULL){
+        return NULL;
+    }
+    //prepare
+    ffi_cif cif;
+    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, in_count, return_type, argTypes) == FFI_OK) {
+        //concat closure with proxy.
+        if (ffi_prep_closure_loc(ptr->closure, &cif, fun_proxy, ud, func_ptr) == FFI_OK) {
+            return ptr; //now we can call func
+        }else{
+            if(msg){
+                strcpy(*msg, "concat closure with function proxy failed!");
+            }
+        }
+    }else{
+        if(msg){
+            strcpy(*msg, "ffi_prep_cif(...) failed!");
+        }
+    }
+    return NULL;
+}
+void hffi_delete_closure(hffi_closure* val){
+    int old = atomic_add(&val->ref, -1);
+    if(old == 1){
+        if(val->closure){
+            ffi_closure_free(val->closure);
+        }
+        free(val);
+    }
+}
+
+hffi_struct* hffi_new_struct(sint8* types, int count, char** msg){
+    //struct data
+    ffi_type *type;
+    size_t *offsets;
+    //raw_type, elements, offsets.
+    type = (ffi_type *) malloc(sizeof(*type) + sizeof (ffi_type *) * (count+1) + sizeof (offsets[0]) * count);
+    type->size = type->alignment = 0;
+    type->type = FFI_TYPE_STRUCT;
+    type->elements = (ffi_type **) (type + 1);
+    ffi_type* tmp_type;
+    for(int i = count -1 ; i >=0 ; i --){
+        tmp_type = to_ffi_type(types[i], msg);
+        if(tmp_type == NULL){
+            free(type);
+            return NULL;
+        }
+        type->elements[i] = tmp_type;
+    }
+    type->elements[count] = NULL;
+    offsets = (size_t *) &type->elements[count+1];
+    ffi_status status = ffi_get_struct_offsets(FFI_DEFAULT_ABI, type, offsets);
+    if (status != FFI_OK){
+        free(type);
+        if(msg){
+            strcpy(*msg, "ffi_get_struct_offsets() failed.");
+        }
+        return NULL;
+    }
+    hffi_struct* ptr = malloc(sizeof(hffi_struct));
+    ptr->data = type;
+    ptr->ref = 1;
+    ptr->count = count;
+    return ptr;
+}
+
+
+

@@ -20,7 +20,6 @@ void hffi_test2(){
     hffi_type* t2 = hffi_new_type_base(FFI_TYPE_SINT32);
     hffi_value* val1 = hffi_new_value_ptr(t1);
     hffi_value* val2 = hffi_new_value_int(t2, 5);
-
     hffi_value* out = hffi_new_value_int(t2, 0);
 
     void* func = testFunc2_1;
@@ -48,6 +47,8 @@ void hffi_test2(){
     hffi_delete_value(val1);
     hffi_delete_value(val2);
     hffi_delete_value(out);
+    hffi_delete_type(t1);
+    hffi_delete_type(t2);
 }
 void hffi_test1(){
     printf("----------- hffi_test1 ---------- \n");
@@ -56,7 +57,6 @@ void hffi_test1(){
     hffi_type* t2 = hffi_new_type_base(FFI_TYPE_SINT32);
     hffi_value* val1 = hffi_new_value_ptr(t1);
     hffi_value* val2 = hffi_new_value_int(t2, 5);
-
     hffi_value* out = hffi_new_value_int(t2, 0);
 
     void* func = testFunc2_0;
@@ -85,4 +85,6 @@ void hffi_test1(){
     hffi_delete_value(val1);
     hffi_delete_value(val2);
     hffi_delete_value(out);
+    hffi_delete_type(t1);
+    hffi_delete_type(t2);
 }
