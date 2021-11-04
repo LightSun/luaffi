@@ -63,7 +63,7 @@ int hffi_get_value_##t(hffi_value* val, t* out_ptr);
 typedef struct hffi_type{
     int8_t base_ffi_type;       //see ffi.h
     int8_t pointer_base_type;   //the raw base type. eg: int** -> int
-    uint8_t pointer_level;      //the pointer level. eg: int** -> 2
+    int8_t pointer_level;      //the pointer level. eg: int** -> 2
     int volatile ref;
 }hffi_type;
 
@@ -83,8 +83,9 @@ typedef struct hffi_closure{
 }hffi_closure;
 
 typedef struct hffi_struct{
-    ffi_type * data; //struct base
-   // void* data;     //the data if struct.
+    ffi_type * type; //struct base info. all types with offsets.
+    void* data;      //the data if struct.
+    int data_size;
     int count;
     int volatile ref;
 }hffi_struct;
@@ -126,6 +127,7 @@ hffi_get_value_auto_x_def(float)
 hffi_get_value_auto_x_def(double)
 
 void hffi_delete_value(hffi_value* val);
+ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg);
 
 //return 0 for success. 1 failed
 int hffi_call(void (*fn)(void), hffi_value** in, int in_count,hffi_value* out, char** msg);
@@ -147,7 +149,18 @@ void hffi_delete_closure(hffi_closure* c);
 
 hffi_struct* hffi_new_struct(sint8* p_types, int p_count, char** msg);
 void hffi_delete_struct(hffi_struct* c);
-//void hffi_struct_getfield();
+/**
+ * @brief hffi_struct_to_value: pack the struct as value
+ * @param c the struct addr
+ * @return the value
+ */
+hffi_value* hffi_struct_to_value(hffi_struct* c);
+/**
+ * @brief hffi_struct_to_value: pack the struct's ptr as value
+ * @param c the struct addr
+ * @return the value
+ */
+hffi_value* hffi_struct_ptr_to_value(hffi_struct* c);
 
 //load lib can like: https://github.com/chfoo/callfunc/blob/ef79a3985be728c42914320ddfc30f9e764f838e/src/c/callfunc.c
 
