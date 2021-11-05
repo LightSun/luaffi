@@ -18,6 +18,7 @@ add_executable(luaffi_app
     hffi.h
     hffi.c
     hffi_test.c
+    hffi_test_struct.c
     libffi_study.c
     main.cpp
     )

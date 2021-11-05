@@ -33,7 +33,7 @@ void hffi_test2(){
     int r = hffi_call(func, arr, 2, out, msg);
     if(r == 0){
         int out_ptr;
-        int out_r = hffi_get_value_int(out, &out_ptr);
+        int out_r = hffi_value_get_int(out, &out_ptr);
         if(out_r == 0){
             int* ptr = val1->ptr;
             printf("hffi_call: out = %d\n", out_ptr);
@@ -70,7 +70,7 @@ void hffi_test1(){
     int r = hffi_call(func, arr, 2, out, msg);
     if(r == 0){
         int out_ptr;
-        int out_r = hffi_get_value_int(out, &out_ptr);
+        int out_r = hffi_value_get_int(out, &out_ptr);
         if(out_r == 0){
             int** ptr = val1->ptr;
             printf("hffi_call: out = %d\n", out_ptr);
