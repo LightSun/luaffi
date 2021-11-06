@@ -295,6 +295,18 @@ void hffi_delete_smtype(hffi_smtype* type){
     }
 }
 //--------------------------------------------------------------
+hffi_struct* hffi_new_struct_base(sint8* types, int count){
+    hffi_smtype* smtypes[count +1];
+    for(int i = 0 ; i < count; i ++){
+        smtypes[i] = hffi_new_smtype(types[i], NULL);
+    }
+    smtypes[count] = NULL;
+    hffi_struct* c = hffi_new_struct(smtypes, -1, NULL);
+    for(int i = 0 ; i < count; i ++){
+        hffi_delete_smtype(smtypes[i]);
+    }
+    return c;
+}
 static inline void setChildrenDataPtrs(hffi_struct* p){
     size_t * offsets = (size_t *) &p->type->elements[p->count+1];
     for(int i = 0 ; i < p->count ; i ++){

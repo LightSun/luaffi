@@ -19,6 +19,8 @@ add_executable(luaffi_app
     hlist.c
     hffi.h
     hffi.c
+    dym_loader.h
+    dym_loader.c
     hffi_test.c
     hffi_test_struct.c
     hffi_test_union.c

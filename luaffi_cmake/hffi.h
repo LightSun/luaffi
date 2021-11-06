@@ -207,6 +207,14 @@ void hffi_delete_smtype(hffi_smtype* type);
 hffi_struct* hffi_new_struct(hffi_smtype** member_types, sint16 parent_pos, char** msg);
 #define hffi_new_struct_simple(types, msg) hffi_new_struct(types, -1, msg)
 
+/**
+ * @brief hffi_new_struct_base:create struct by base types. except struct or its' pointer.
+ * @param types: the base types. see HFFI_TYPE_<X>
+ * @param count: the type count
+ * @return the struct ptr.
+ */
+hffi_struct* hffi_new_struct_base(sint8* types, int count);
+
 void hffi_delete_struct(hffi_struct* c);
 void hffi_delete_structs(hffi_struct** cs, int count);
 
