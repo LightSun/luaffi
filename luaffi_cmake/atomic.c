@@ -57,3 +57,16 @@ int atomic_add(int volatile *a, int value){
   return oldvalue;
 #endif
 }
+
+int atomic_get(int volatile *a)
+{
+#if defined(USE_C11_ATOMICS)
+  return atomic_load(a);
+#else
+  int value;
+  do {
+    value = *a;
+  } while (!atomic_cas(a, value, value));
+  return value;
+#endif
+}

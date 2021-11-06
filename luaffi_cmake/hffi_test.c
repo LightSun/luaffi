@@ -24,13 +24,14 @@ void hffi_test2(){
 
     void* func = testFunc2_1;
 
-    hffi_value* arr[2];
+    hffi_value* arr[3];
     arr[0] = val1;
     arr[1] = val2;
+    arr[2] = NULL;
     char _m[128];
     char* msg[1];
     msg[0] = _m;
-    int r = hffi_call(func, arr, 2, out, msg);
+    int r = hffi_call(func, arr, out, msg);
     if(r == 0){
         int out_ptr;
         int out_r = hffi_value_get_int(out, &out_ptr);
@@ -61,13 +62,14 @@ void hffi_test1(){
 
     void* func = testFunc2_0;
 
-    hffi_value* arr[2];
+    hffi_value* arr[3];
     arr[0] = val1;
     arr[1] = val2;
+    arr[2] = NULL;
     char _m[128];
     char* msg[1];
     msg[0] = _m;
-    int r = hffi_call(func, arr, 2, out, msg);
+    int r = hffi_call(func, arr, out, msg);
     if(r == 0){
         int out_ptr;
         int out_r = hffi_value_get_int(out, &out_ptr);

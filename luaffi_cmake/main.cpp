@@ -12,6 +12,10 @@ void testCall2();
 void testClosure();
 void hffi_test1();
 void hffi_test2();
+void hffi_test_struct();
+void hffi_test_struct2();
+void hffi_test_struct3();
+void test_call_unions();
 }
 
 #define CALL_LUA(L, func)\
@@ -36,15 +40,24 @@ LUALIB_API void luaL_openlibs2(lua_State *L, const luaL_Reg funcs[]) {
 
 #define LUA_DIR "../luaffi_cmake/lua_script/"
 
-extern "C" int main()
-{
-    //cout << "Hello World!" << endl;
+static void test_ffi_all(){
     testCall();
     testCall2();
     testClosure();
     hffi_test1();
     hffi_test2();
+    hffi_test_struct();
+    hffi_test_struct2();
+    hffi_test_struct3();
+    test_call_unions();
+}
 
+extern "C" int main()
+{
+    //cout << "Hello World!" << endl;
+    test_ffi_all();
+
+    printf("-------------- start lua -------------- \n");
     lua_State * L = luaL_newstate();
     luaL_openlibs(L);
     luaL_openlibs2(L, funcs);

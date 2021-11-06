@@ -15,10 +15,13 @@ add_library(ffi2 STATIC ffi2.h ffi.c ffi_ext.c)
 add_executable(luaffi_app
     atomic.h
     atomic.c
+    hlist.h
+    hlist.c
     hffi.h
     hffi.c
     hffi_test.c
     hffi_test_struct.c
+    hffi_test_union.c
     libffi_study.c
     main.cpp
     )
