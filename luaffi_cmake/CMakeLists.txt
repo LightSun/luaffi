@@ -13,10 +13,14 @@ add_library(ffi2 STATIC ffi2.h ffi.c ffi_ext.c)
 
 # USE_C11_ATOMICS,USE_MSC_ATOMICS,USE_GCC_ATOMICS,USE_PTHREAD_ATOMICS
 add_executable(luaffi_app
+    h_alloctor.h
+    h_alloctor.c
     atomic.h
     atomic.c
-    hlist.h
-    hlist.c
+    h_list.h
+    h_list.c
+    h_linklist.h
+    h_linklist.c
     hffi.h
     hffi.c
     dym_loader.h

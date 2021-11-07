@@ -88,14 +88,17 @@
 #define ALLOW_MISALIGNED_ACCESS
 #endif
 //------------------------------------------
+#include "atomic.h"
+#define __DYM_BUF_LEN 256
+
 dym_lib* dym_new_lib(const char* libname){
     void* lib;
     lib = LoadLibraryA(libname);
 
     #ifdef LIB_FORMAT_1
         if (!lib) {
-            char buf[128];
-            snprintf(buf, 128, LIB_FORMAT_1, libname);
+            char buf[__DYM_BUF_LEN];
+            snprintf(buf, __DYM_BUF_LEN, LIB_FORMAT_1, libname);
             lib = LoadLibraryA(buf);
     #ifdef _WIN32
             if(!lib){
@@ -107,8 +110,8 @@ dym_lib* dym_new_lib(const char* libname){
 
     #ifdef LIB_FORMAT_2
         if (!lib) {
-            char buf[128];
-            snprintf(buf, 128, LIB_FORMAT_2, libname);
+            char buf[__DYM_BUF_LEN];
+            snprintf(buf, __DYM_BUF_LEN, LIB_FORMAT_2, libname);
             lib = LoadLibraryA(buf);
         }
     #endif
@@ -117,19 +120,49 @@ dym_lib* dym_new_lib(const char* libname){
     }
     dym_lib* dymlib = malloc(sizeof (dym_lib));
     dymlib->lib = lib;
-    dymlib->func_nodes = NULL;
+    dymlib->ref = 1;
+    dymlib->total_func_ref = 0;
+    dymlib->func_list = array_list_new_simple();
     return dymlib;
 }
-void dym_delete_lib(dym_lib* lib){
-    //TODO
+
+static void __func_release(void* ud, void* data){
+    dym_func* func = data;
+    free(func->name);
+    free(func);
+}
+static inline void __dym_delete_lib(dym_lib* lib, int checkFunc){
+    if(checkFunc && atomic_get(&lib->total_func_ref) != 0){
+        return;
+    }
+    if(atomic_add(&lib->ref, -1) == 1){
+        array_list_delete(lib->func_list, __func_release, NULL);
 #ifdef _WIN32
-    FreeLibrary((HANDLE)lib->lib);
+        FreeLibrary((HANDLE)lib->lib);
 #else
-    dlclose(lib);
+        dlclose(lib);
 #endif
-    free(lib);
+        free(lib);
+    }
+}
+void dym_delete_lib(dym_lib* lib){
+    __dym_delete_lib(lib, true);
+}
+//-------------------------------------
+static int __find_ptr(void* ud, int size, int idx, void* data){
+    const char* func_name = ud;
+    if(strcmp(((dym_func*)data)->name, func_name) == 0){
+        return 0;
+    }
+    return -1;
 }
 dym_func* dym_lib_get_function(dym_lib* lib, const char* func_name){
+    void* data = array_list_find(lib->func_list, __find_ptr, (void*)func_name);
+    if(data != NULL){
+        atomic_add(&lib->total_func_ref, 1);
+        return (dym_func*)data;
+    }
+
     void* sym = GetProcAddressA(lib->lib, func_name);
     if(sym == NULL){
         return NULL;
@@ -137,12 +170,33 @@ dym_func* dym_lib_get_function(dym_lib* lib, const char* func_name){
     dym_func* func = malloc(sizeof(dym_func));
     func->name = malloc(strlen(func_name) + 1);
     func->func_ptr = sym;
-
-    if(lib->func_nodes){
-        lib->func_nodes = list_insert_beginning(lib->func_nodes, func);
-    }else{
-        lib->func_nodes = list_create(func);
-    }
+    func->lib = lib;
+    atomic_add(&lib->total_func_ref, 1);
     return func;
 }
 
+//-----------------------
+int __delete_func_find(void* ud,void* rawEle, void* pEle){
+    dym_func* f1 = rawEle;
+    dym_func* f2 = pEle;
+    return strcmp(f1->name, f2->name);
+}
+void dym_delete_func(dym_func* func){
+   void* data = array_list_remove(func->lib->func_list, func, __delete_func_find, NULL);
+   if(data == NULL){
+       return;
+   }
+   dym_lib* lib = func->lib;
+   //remove func and check lib if need remove.
+   __func_release(NULL, data);
+   if(atomic_add(&lib->total_func_ref, -1) == 1){
+        __dym_delete_lib(lib, false);
+   }
+}
+void dym_delete_func_by_name(dym_lib* lib, const char* name){
+    dym_func func;
+    func.lib = lib;
+    func.name = strdup(name);
+    dym_delete_func(&func);
+    free(func.name);
+}

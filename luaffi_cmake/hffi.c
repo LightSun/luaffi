@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include "hffi.h"
 #include "atomic.h"
-#include "hlist.h"
+#include "h_linklist.h"
+#include "h_alloctor.h"
 
 #define hffi_new_value_auto_x(type) \
 hffi_value* hffi_new_value_##type(hffi_type* t, type val){\
@@ -56,7 +57,7 @@ ffi_type* to_ffi_type(int8_t v, char** msg){
 }
 //---------------------------------------------------------------
 hffi_type* hffi_new_type_base(int8_t ffi_type){
-    hffi_type* ptr = malloc(sizeof (hffi_type));
+    hffi_type* ptr = MALLOC(sizeof (hffi_type));
     ptr->base_ffi_type = ffi_type;
     ptr->pointer_level = 0;
     ptr->pointer_base_type = FFI_TYPE_VOID;
@@ -64,7 +65,7 @@ hffi_type* hffi_new_type_base(int8_t ffi_type){
     return ptr;
 }
 hffi_type* hffi_new_type(int8_t ffi_type, int8_t pointer_type,uint8_t pointer_level){
-    hffi_type* ptr = malloc(sizeof (hffi_type));
+    hffi_type* ptr = MALLOC(sizeof (hffi_type));
     ptr->base_ffi_type = ffi_type;
     ptr->pointer_level = pointer_level;
     ptr->pointer_base_type = pointer_type;
@@ -82,7 +83,7 @@ int hffi_type_size(hffi_type* t){
 void hffi_delete_type(hffi_type* t){
     int old = atomic_add(&t->ref, -1);
     if(old == 1){
-        free(t);
+        FREE(t);
     }
 }
 //------------------------- value ------------------------
@@ -90,10 +91,10 @@ hffi_value* hffi_new_value_ptr(hffi_type* type){
     if(type->base_ffi_type != FFI_TYPE_POINTER) return NULL;
 #define INIT_MEM(t, s)\
 case t:{\
-    val_ptr->ptr = malloc(s);\
+    val_ptr->ptr = MALLOC(s);\
 }break;
 
-    hffi_value* val_ptr = malloc(sizeof(hffi_value));
+    hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     switch (type->pointer_base_type) {
         INIT_MEM(FFI_TYPE_SINT8, sizeof (sint8*))
         INIT_MEM(FFI_TYPE_UINT8, sizeof (uint8*))
@@ -115,8 +116,8 @@ case t:{\
     return val_ptr;
 }
 hffi_value* hffi_new_value_auto(hffi_type* type, int size){
-    hffi_value* val_ptr = malloc(sizeof(hffi_value));
-    val_ptr->ptr = malloc(size);
+    hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
+    val_ptr->ptr = MALLOC(size);
     val_ptr->type = type;
     val_ptr->ref = 1;
     if(type){
@@ -158,15 +159,15 @@ void hffi_delete_value(hffi_value* val){
             hffi_delete_struct(c);
         }else{
             if(val->ptr !=NULL){
-                free(val->ptr);
+                FREE(val->ptr);
             }
         }
         hffi_delete_type(val->type);
-        free(val);
+        FREE(val);
     }
 }
 hffi_value* hffi_new_value_struct(hffi_struct* c){
-    hffi_value* val_ptr = malloc(sizeof(hffi_value));
+    hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     val_ptr->ptr = c;
     val_ptr->type = hffi_new_type_base(HFFI_TYPE_STRUCT);
     val_ptr->ref = 1;
@@ -175,7 +176,7 @@ hffi_value* hffi_new_value_struct(hffi_struct* c){
 }
 hffi_value* hffi_new_value_struct_ptr(hffi_struct* c){
     hffi_type* t = hffi_new_type(HFFI_TYPE_POINTER, HFFI_TYPE_STRUCT, 1);
-    hffi_value* val_ptr = malloc(sizeof(hffi_value));
+    hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     val_ptr->ptr = c;
     val_ptr->type = t;
     val_ptr->ref = 1;
@@ -268,7 +269,7 @@ int hffi_call(void (*fn)(void), hffi_value** in,hffi_value* out, char** msg){
 }
 
 hffi_smtype* hffi_new_smtype(sint8 ffi_type, hffi_smtype** member_types){
-    hffi_smtype* ptr = malloc(sizeof (hffi_smtype));
+    hffi_smtype* ptr = MALLOC(sizeof (hffi_smtype));
     ptr->ffi_type = ffi_type;
     ptr->ref = 1;
     ptr->elements = member_types;
@@ -291,7 +292,7 @@ void hffi_delete_smtype(hffi_smtype* type){
                 count++;
             }
         }
-        free(type);
+        FREE(type);
     }
 }
 //--------------------------------------------------------------
@@ -326,14 +327,14 @@ hffi_struct* hffi_new_struct(hffi_smtype** member_types, sint16 parent_pos, char
         count++;
     }
     //child structs
-    hffi_struct** children = malloc(sizeof (hffi_struct*) * count);
+    hffi_struct** children = MALLOC(sizeof (hffi_struct*) * count);
     memset(children, 0, sizeof (hffi_struct*) * count);
 
     //struct data
     ffi_type *type;
     size_t *offsets;
     //raw_type, elements, offsets.
-    type = (ffi_type *) malloc(sizeof(*type) + sizeof (ffi_type *) * (count+1) + sizeof (offsets[0]) * count);
+    type = (ffi_type *) MALLOC(sizeof(*type) + sizeof (ffi_type *) * (count+1) + sizeof (offsets[0]) * count);
     type->size = type->alignment = 0;
     type->type = FFI_TYPE_STRUCT;
     type->elements = (ffi_type **) (type + 1);
@@ -368,13 +369,13 @@ hffi_struct* hffi_new_struct(hffi_smtype** member_types, sint16 parent_pos, char
     int total_size = offsets[count  - 1] +  type->elements[count  - 1]->size;//TODO need align?
 
     //create hffi_struct to manage struct.
-    hffi_struct* ptr = malloc(sizeof(hffi_struct));
+    hffi_struct* ptr = MALLOC(sizeof(hffi_struct));
     ptr->type = type;
     ptr->count = count;
     ptr->data_size = total_size;
-    //of create by parent struct . never need malloc memory.
+    //of create by parent struct . never need MALLOC memory.
     if(parent_pos < 0){
-        ptr->data = malloc(total_size);
+        ptr->data = MALLOC(total_size);
     }else{
         ptr->data = NULL;
     }
@@ -386,7 +387,7 @@ hffi_struct* hffi_new_struct(hffi_smtype** member_types, sint16 parent_pos, char
     return ptr;
 
 failed:
-    free(type);
+    FREE(type);
     hffi_delete_structs(children, count);
     return NULL;
 }
@@ -397,25 +398,25 @@ void hffi_delete_structs(hffi_struct** cs, int count){
                  hffi_delete_struct(cs[i]);
              }
         }
+        FREE(cs);
     }
 }
 void hffi_delete_struct(hffi_struct* val){
     int old = atomic_add(&val->ref, -1);
     if(old == 1){
         if(val->type){
-            free(val->type);
+            FREE(val->type);
         }
         //children
         if(val->children != NULL){
             hffi_delete_structs(val->children, val->count);
-            free(val->children);
         }
-        // malloc data by self
+        // MALLOC data by self
         if(val->parent_pos < 0 && val->data){
-            free(val->data);
+            FREE(val->data);
         }
         //self
-        free(val);
+        FREE(val);
     }
 }
 void hffi_struct_ref(hffi_struct* c, int ref_count){
@@ -424,103 +425,63 @@ void hffi_struct_ref(hffi_struct* c, int ref_count){
 
 
 //--------------------------------------------
-hffi_manager* hffi_new_manager(int maxValues, int maxTypes, int maxStructs, int maxSmTypes){
-    hffi_manager* ptr = malloc(sizeof (hffi_manager));
+//func_data(old->data);
+#define RELEASE_LINK_LIST(list, x) \
+if(list){\
+    linklist_node* node = list;\
+    linklist_node* old;\
+    do{\
+        old = node;\
+        node = node->next;\
+        {x;}\
+        FREE(old);\
+    }while(node != NULL);\
+}
+#define ADD_VAL_TO_MANAGER(vals, c)\
+if(hm->vals == NULL){\
+    hm->vals = linklist_create(v);\
+}else{\
+    hm->vals = linklist_insert_beginning(hm->values, v);\
+}\
+hm->c++;\
+return hm->c;
+
+hffi_manager* hffi_new_manager(){
+    hffi_manager* ptr = MALLOC(sizeof (hffi_manager));
     memset(ptr, 0, sizeof (hffi_manager));
-    if(maxValues > 0){
-        ptr->values = malloc(sizeof (hffi_value) * maxValues);
-    }
-    if(maxTypes > 0){
-        ptr->types = malloc(sizeof (hffi_type) * maxTypes);
-    }
-    if(maxStructs > 0){
-        ptr->structs = malloc(sizeof (hffi_struct) * maxStructs);
-    }
-    if(maxSmTypes > 0){
-        ptr->smtypes = malloc(sizeof (hffi_smtype) * maxSmTypes);
-    }
-    ptr->max_values = maxValues;
-    ptr->max_types = maxTypes;
-    ptr->max_structs = maxStructs;
-    ptr->max_smtypes = maxSmTypes;
     return ptr;
 }
 void hffi_delete_manager(hffi_manager* ptr){
-    if(ptr->values){
-        for(int i = 0, c = atomic_get(&ptr->count_values); i < c ; i ++){
-            hffi_delete_value(ptr->values[i]);
-        }
-        free(ptr->values);
-    }
-    if(ptr->types){
-        for(int i = 0, c = atomic_get(&ptr->count_types); i < c ; i ++){
-            hffi_delete_type(ptr->types[i]);
-        }
-    }
-    if(ptr->structs){
-        for(int i = 0, c = atomic_get(&ptr->count_structs); i < c ; i ++){
-            hffi_delete_struct(ptr->structs[i]);
-        }
-    }
-    if(ptr->smtypes){
-        for(int i = 0, c = atomic_get(&ptr->count_smtypes); i < c ; i ++){
-            hffi_delete_smtype(ptr->smtypes[i]);
-        }
-    }
-    if(ptr->list){
-        list_node* node = ptr->list;
-        list_node* old;
-        do{
-            old = node;
-            node = node->next;
-            free(old->data);
-            free(old);
-        }while(node != NULL);
-    }
-    free(ptr);
+    RELEASE_LINK_LIST(ptr->values, hffi_delete_value((hffi_value*)old->data))
+    RELEASE_LINK_LIST(ptr->types, hffi_delete_type((hffi_type*)old->data))
+    RELEASE_LINK_LIST(ptr->structs, hffi_delete_struct((hffi_struct*)old->data))
+    RELEASE_LINK_LIST(ptr->smtypes, hffi_delete_smtype((hffi_smtype*)old->data))
+    RELEASE_LINK_LIST(ptr->hcifs, hffi_delete_cif((hffi_cif*)old->data))
+
+    RELEASE_LINK_LIST(ptr->list, FREE(old->data));
+    FREE(ptr);
 }
 int hffi_manager_add_value(hffi_manager* hm,hffi_value* v){
-    int old = atomic_add(&hm->count_values, 1);
-    if(old >= atomic_get(&hm->max_values)){
-        atomic_add(&hm->count_values, -1);
-        return -1;
-    }
-    hm->values[old] = v;
-    return old + 1;
+    ADD_VAL_TO_MANAGER(values, value_count)
 }
 int hffi_manager_add_type(hffi_manager* hm,hffi_type* v){
-    int old = atomic_add(&hm->count_types, 1);
-    if(old >= atomic_get(&hm->max_types)){
-        atomic_add(&hm->count_types, -1);
-        return -1;
-    }
-    hm->types[old] = v;
-    return old + 1;
+    ADD_VAL_TO_MANAGER(types, type_count)
 }
 int hffi_manager_add_smtype(hffi_manager* hm,hffi_smtype* v){
-    int old = atomic_add(&hm->count_smtypes, 1);
-    if(old >= atomic_get(&hm->max_smtypes)){
-        atomic_add(&hm->count_smtypes, -1);
-        return -1;
-    }
-    hm->smtypes[old] = v;
-    return old + 1;
+    ADD_VAL_TO_MANAGER(smtypes, smtype_count)
 }
 int hffi_manager_add_struct(hffi_manager* hm,hffi_struct* v){
-    int old = atomic_add(&hm->count_structs, 1);
-    if(old >= atomic_get(&hm->max_structs)){
-        atomic_add(&hm->count_structs, -1);
-        return -1;
-    }
-    hm->structs[old] = v;
-    return old + 1;
+   ADD_VAL_TO_MANAGER(structs, struct_count)
+}
+int hffi_manager_add_cif(hffi_manager* hm,hffi_cif* v){
+   ADD_VAL_TO_MANAGER(hcifs, hcif_count)
 }
 void* hffi_manager_alloc(hffi_manager* hm,int size){
-    void* data = malloc(size);
+    void* data = MALLOC(size);
     if(hm->list == NULL){
-        hm->list = list_create(data);
+        hm->list = linklist_create(data);
     }else{
-        hm->list = list_insert_beginning(hm->list, data);
+        hm->list = linklist_insert_beginning(hm->list, data);
     }
     return data;
 }
@@ -529,7 +490,7 @@ void* hffi_manager_alloc(hffi_manager* hm,int size){
 hffi_closure* hffi_new_closure(void* func_ptr, void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
                                hffi_value** val_params, hffi_value* val_return, void* ud, char** msg){
     hffi_get_pointer_count(in_count, val_params);
-    hffi_closure* ptr = malloc(sizeof(hffi_closure));
+    hffi_closure* ptr = MALLOC(sizeof(hffi_closure));
     memset(ptr, 0, sizeof(hffi_closure));
     ptr->ref = 1;
     ptr->code = &func_ptr;
@@ -605,7 +566,97 @@ void hffi_delete_closure(hffi_closure* val){
         if(val->val_return){
             hffi_delete_value(val->val_return);
         }
-        free(val);
+        FREE(val);
     }
 }
+//------------------------------------
+hffi_cif* hffi_new_cif(hffi_value** in, hffi_value* out, char** msg){
+    hffi_get_pointer_count(in_count, in);
+    //add ref
+    for(int i = 0 ; i < in_count ; i ++){
+        atomic_add(&in[i]->ref, 1);
+    }
+    atomic_add(&out->ref, 1);
 
+    ffi_type ** argTypes = NULL;
+    void **args = NULL;
+    if(in_count > 0){
+        argTypes = alloca(sizeof(ffi_type *) *in_count);
+        args = MALLOC(sizeof(void *) *in_count);
+        for(int i = 0 ; i < in_count ; i ++){
+            argTypes[i] = hffi_value_get_rawtype(in[i], msg);
+            if(argTypes[i] == NULL){
+                return NULL;
+            }
+            //cast param value
+            args[i] = __get_data_ptr(in[i]);
+        }
+    }
+    //prepare call
+    ffi_type *return_type = hffi_value_get_rawtype(out, msg);
+    if(return_type == NULL){
+        return NULL;
+    }
+    ffi_cif* cif = MALLOC(sizeof (ffi_cif));
+
+    ffi_status s = ffi_prep_cif(cif, FFI_DEFAULT_ABI, (unsigned int)in_count, return_type, argTypes);
+    switch (s) {
+    case FFI_OK:{
+       // ffi_call(&cif, fn, __get_data_ptr(out), args);
+        //prepare
+        hffi_cif* hcif = MALLOC(sizeof (hffi_cif));
+        hcif->cif = cif;
+        hcif->args = args;
+        hcif->in = in;
+        hcif->out = out;
+        hcif->ref = 1;
+        hcif->in_count = in_count;
+        return hcif;
+    }break;
+
+    case FFI_BAD_ABI:
+        if(msg){
+            strcpy(*msg, "FFI_BAD_ABI");
+        }
+        break;
+    case FFI_BAD_TYPEDEF:
+        if(msg){
+            strcpy(*msg, "FFI_BAD_TYPEDEF");
+        }
+        break;
+    }
+    FREE(cif);
+    //ref
+    for(int i = 0 ; i < in_count ; i ++){
+        hffi_delete_value(in[i]);
+    }
+    hffi_delete_value(out);
+    FREE(args);
+    return NULL;
+}
+void hffi_delete_cif(hffi_cif* hcif){
+    if(atomic_add(&hcif->ref, -1) == 1){
+        FREE(hcif->cif);
+        FREE(hcif->args);
+        for(int i = 0 ; i < hcif->in_count ; i ++){
+            hffi_delete_value(hcif->in[i]);
+        }
+        hffi_delete_value(hcif->out);
+        FREE(hcif);
+    }
+}
+void hffi_cif_call(hffi_cif* hcif, void* fn){
+    ffi_call(hcif->cif, fn, __get_data_ptr(hcif->out), hcif->args);
+}
+hffi_value* hffi_cif_get_result_value(hffi_cif* hcif){
+    return hcif->out;
+}
+hffi_value* hffi_cif_get_param_value(hffi_cif* hcif, int index){
+    if(hcif->in_count == 0 || index >= hcif->in_count){
+        return NULL;
+    }
+    return hcif->in[index];
+}
+int hffi_cif_get_param_count(hffi_cif* hcif){
+    return hcif->in_count;
+}

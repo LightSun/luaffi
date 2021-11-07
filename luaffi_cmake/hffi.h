@@ -68,7 +68,7 @@ int n = 0;\
 while(p[n] != NULL){\
     n++;\
 }
-struct list_node;
+struct linklist_node;
 
 typedef struct hffi_type{
     int8_t base_ffi_type;       //see ffi.h
@@ -108,21 +108,27 @@ typedef struct hffi_closure{
     int volatile ref;        // ref count
 }hffi_closure;
 
-typedef struct hffi_manager{
-    hffi_value** values;
-    hffi_type** types;
-    hffi_struct** structs;
-    hffi_smtype** smtypes;
-    int max_values;
-    int max_types;
-    int max_structs;
-    int max_smtypes;
-    int volatile count_values;
-    int volatile count_types;
-    int volatile count_structs;
-    int volatile count_smtypes;
+typedef struct hffi_cif{
+    ffi_cif* cif;
+    hffi_value** in;
+    hffi_value* out;
+    void **args;
+    int in_count;
+    int volatile ref;        // ref count
+}hffi_cif;
 
-    struct list_node* list; //help list for memorys
+typedef struct hffi_manager{
+    struct linklist_node* values;
+    struct linklist_node* types;
+    struct linklist_node* structs;
+    struct linklist_node* smtypes;
+    struct linklist_node* hcifs;
+    int value_count;
+    int type_count;
+    int struct_count;
+    int smtype_count;
+    int hcif_count;
+    struct linklist_node* list; //help list for memorys
 }hffi_manager;
 
 
@@ -181,7 +187,6 @@ void hffi_delete_value(hffi_value* val);
 ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg);
 hffi_struct* hffi_value_get_struct(hffi_value* c);
 
-
 /**
  * @brief hffi_call: do call ffi.
  * @param in :  the input parameters. must end with NULL
@@ -227,14 +232,13 @@ void hffi_struct_ref(hffi_struct* c, int ref_count);
 
 //----------------- manager -------------------
 
-#define hffi_new_manager_simple() hffi_new_manager(8, 8, 4, 8)
-#define hffi_new_manager_simple2() hffi_new_manager(16, 16, 8, 16)
-hffi_manager* hffi_new_manager(int maxValues, int maxTypes, int maxStructs, int maxSmTypes);
+hffi_manager* hffi_new_manager();
 void hffi_delete_manager(hffi_manager*);
 int hffi_manager_add_value(hffi_manager*, hffi_value* v);
 int hffi_manager_add_type(hffi_manager*, hffi_type* v);
 int hffi_manager_add_smtype(hffi_manager*, hffi_smtype* v);
 int hffi_manager_add_struct(hffi_manager*, hffi_struct* v);
+int hffi_manager_add_cif(hffi_manager* hm,hffi_cif* v);
 /**
  * @brief hffi_manager_alloc: allocate a memory for temp use. the memory will be released by call 'hffi_delete_manager()'
  * @param size the memory size
@@ -257,5 +261,12 @@ hffi_closure* hffi_new_closure(void* codeloc, void (*fun_proxy)(ffi_cif*,void* r
                                hffi_value** param_types, hffi_value* return_type, void* ud, char** msg);
 void hffi_delete_closure(hffi_closure* c);
 
-//load lib can like: https://github.com/chfoo/callfunc/blob/ef79a3985be728c42914320ddfc30f9e764f838e/src/c/callfunc.c
+//---------------------- cif ------------------------
+hffi_cif* hffi_new_cif(hffi_value** in, hffi_value* out, char** msg);
+void hffi_delete_cif(hffi_cif* hcif);
+void hffi_cif_call(hffi_cif* hcif, void* fun);
+hffi_value* hffi_cif_get_result_value(hffi_cif* hcif);
+hffi_value* hffi_cif_get_param_value(hffi_cif* hcif, int index);
+int hffi_cif_get_param_count(hffi_cif* hcif);
 
+//load lib can like: https://github.com/chfoo/callfunc/blob/ef79a3985be728c42914320ddfc30f9e764f838e/src/c/callfunc.c
