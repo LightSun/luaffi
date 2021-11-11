@@ -16,6 +16,7 @@ void hffi_test_struct();
 void hffi_test_struct2();
 void hffi_test_struct3();
 void test_call_unions();
+void test_harray();
 }
 
 #define CALL_LUA(L, func)\
@@ -41,6 +42,7 @@ LUALIB_API void luaL_openlibs2(lua_State *L, const luaL_Reg funcs[]) {
 #define LUA_DIR "../luaffi_cmake/lua_script/"
 
 static void test_ffi_all(){
+    test_harray();
     testCall();
     testCall2();
     testClosure();

@@ -89,6 +89,7 @@
 #endif
 //------------------------------------------
 #include "atomic.h"
+#include "h_alloctor.h"
 #define __DYM_BUF_LEN 256
 
 dym_lib* dym_new_lib(const char* libname){
@@ -118,7 +119,7 @@ dym_lib* dym_new_lib(const char* libname){
     if(lib == NULL){
         return NULL;
     }
-    dym_lib* dymlib = malloc(sizeof (dym_lib));
+    dym_lib* dymlib = MALLOC(sizeof (dym_lib));
     dymlib->lib = lib;
     dymlib->ref = 1;
     dymlib->total_func_ref = 0;
@@ -128,8 +129,8 @@ dym_lib* dym_new_lib(const char* libname){
 
 static void __func_release(void* ud, void* data){
     dym_func* func = data;
-    free(func->name);
-    free(func);
+    FREE(func->name);
+    FREE(func);
 }
 static inline void __dym_delete_lib(dym_lib* lib, int checkFunc){
     if(checkFunc && atomic_get(&lib->total_func_ref) != 0){
@@ -142,7 +143,7 @@ static inline void __dym_delete_lib(dym_lib* lib, int checkFunc){
 #else
         dlclose(lib);
 #endif
-        free(lib);
+        FREE(lib);
     }
 }
 void dym_delete_lib(dym_lib* lib){
@@ -159,7 +160,6 @@ static int __find_ptr(void* ud, int size, int idx, void* data){
 dym_func* dym_lib_get_function(dym_lib* lib, const char* func_name){
     void* data = array_list_find(lib->func_list, __find_ptr, (void*)func_name);
     if(data != NULL){
-        atomic_add(&lib->total_func_ref, 1);
         return (dym_func*)data;
     }
 
@@ -167,8 +167,8 @@ dym_func* dym_lib_get_function(dym_lib* lib, const char* func_name){
     if(sym == NULL){
         return NULL;
     }
-    dym_func* func = malloc(sizeof(dym_func));
-    func->name = malloc(strlen(func_name) + 1);
+    dym_func* func = MALLOC(sizeof(dym_func));
+    func->name = strdup(func_name);
     func->func_ptr = sym;
     func->lib = lib;
     atomic_add(&lib->total_func_ref, 1);
@@ -176,7 +176,7 @@ dym_func* dym_lib_get_function(dym_lib* lib, const char* func_name){
 }
 
 //-----------------------
-int __delete_func_find(void* ud,void* rawEle, void* pEle){
+static int __delete_func_find(void* ud,void* rawEle, void* pEle){
     dym_func* f1 = rawEle;
     dym_func* f2 = pEle;
     return strcmp(f1->name, f2->name);
@@ -198,5 +198,8 @@ void dym_delete_func_by_name(dym_lib* lib, const char* name){
     func.lib = lib;
     func.name = strdup(name);
     dym_delete_func(&func);
-    free(func.name);
+    FREE(func.name);
+}
+void dym_func_ref(dym_func* func, int c){
+    atomic_add(&func->lib->total_func_ref, c);
 }

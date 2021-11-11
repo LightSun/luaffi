@@ -9,6 +9,7 @@ typedef struct array_list{
 }array_list;
 
 #define array_list_new_simple() array_list_new(8, 0.75f)
+#define array_list_new2(init_count) array_list_new(init_count, 0.75f)
 array_list* array_list_new(int init_count, float factor);
 
 /**
@@ -18,6 +19,8 @@ array_list* array_list_new(int init_count, float factor);
  * @param ud the userdata
  */
 void array_list_delete(array_list* list, void (*Func)(void* ud,void* ele), void* ud);
+
+void array_list_delete2(array_list* list, void (*Func)(void* ele));
 
 void array_list_ensure_capacity(array_list* list, int cap);
 

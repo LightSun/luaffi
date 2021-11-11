@@ -14,9 +14,9 @@ static inline void __grow(array_list* list, int minCapacity){
     void* new_data = h_alloctor_realloc(list->data, sizeof (void*) * newCapacity);
     if(new_data == NULL){
         void** old = list->data;
-        list->data = h_alloctor_alloc(sizeof (void*) * newCapacity);
+        list->data = MALLOC(sizeof (void*) * newCapacity);
         memcpy(list->data, old, sizeof (void*) * oldCapacity);
-        h_alloctor_free(old);
+        FREE(old);
     }else{
         list->data = new_data;
     }
@@ -31,19 +31,31 @@ array_list* array_list_new(int init_count, float factor){
     if(factor > 1 || init_count <= 0){
         return NULL;
     }
-    array_list* l = h_alloctor_alloc(sizeof (array_list));
-    l->data = h_alloctor_alloc(init_count * sizeof (void*));
-    l->factor = factor;
+    array_list* l = MALLOC(sizeof (array_list));
+    l->data = MALLOC(init_count * sizeof (void*));
     l->max_count = init_count;
     l->element_count = 0;
+    l->factor = factor;
     return l;
 }
 void array_list_delete(array_list* list, void (*Func)(void* ud,void* ele), void* ud){
-    for(int i = 0; i < list->element_count; i ++){
-        Func(ud, list->data[i]);
+    if(Func){
+        for(int i = 0; i < list->element_count; i ++){
+            Func(ud, list->data[i]);
+        }
     }
-    h_alloctor_free(list->data);
-    h_alloctor_free(list);
+    FREE(list->data);
+    FREE(list);
+}
+
+void array_list_delete2(array_list* list, void (*Func)(void* ele)){
+    if(Func){
+        for(int i = 0; i < list->element_count; i ++){
+            Func(list->data[i]);
+        }
+    }
+    FREE(list->data);
+    FREE(list);
 }
 
 int array_list_size(array_list* list){

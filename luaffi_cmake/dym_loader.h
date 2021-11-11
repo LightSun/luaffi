@@ -30,5 +30,8 @@ dym_func* dym_lib_get_function(dym_lib* lib, const char* func_name);
 void dym_delete_func(dym_func* func);
 void dym_delete_func_by_name(dym_lib* lib, const char* name);
 
+void dym_func_ref(dym_func* func, int c);
+
+
 
 #endif // DYM_LOADER_H
