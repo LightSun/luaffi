@@ -26,7 +26,9 @@ typedef struct hffi_type{
 typedef struct hffi_value{
     hffi_type* type;
     int volatile ref;        //ref count
-    void* ptr;               //may be data ptr/struct ptr
+    void* ptr;               //may be data-ptr/struct-ptr/harray-ptr
+    ffi_type* ffi_type;      //cache ffi_type
+    struct array_list* sub_types;
 }hffi_value;
 
 //struct member type
@@ -134,13 +136,16 @@ hffi_value* hffi_new_value_struct(hffi_struct* c);
 hffi_value* hffi_new_value_struct_ptr(hffi_struct* c);
 
 hffi_value* hffi_new_value_harray(struct harray* arr);
+hffi_value* hffi_new_value_harray_ptr(struct harray* arr);
 
 void hffi_delete_value(hffi_value* val);
 void hffi_value_ref(hffi_value* val, int count);
 void hffi_value_set_ptr_base_type(hffi_value* val, sint8 base);
 
 ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg);
+
 hffi_struct* hffi_value_get_struct(hffi_value* c);
+struct harray* hffi_value_get_harray(hffi_value* val);
 
 /**
  * @brief hffi_call: do call ffi.
@@ -166,6 +171,8 @@ int hffi_call_abi(int abi, void (*fn)(void), hffi_value** in, hffi_value* out, c
 hffi_smtype* hffi_new_smtype(sint8 ffi_type, hffi_smtype** member_types);
 hffi_smtype* hffi_new_smtype_struct(hffi_struct* _struct);
 hffi_smtype* hffi_new_smtype_struct_ptr(hffi_struct* _struct);
+hffi_smtype* hffi_new_smtype_harray(struct harray* array);
+hffi_smtype* hffi_new_smtype_harray_ptr(struct harray* array);
 void hffi_delete_smtype(hffi_smtype* type);
 
 //---------------- struct -----------------
@@ -176,19 +183,19 @@ void hffi_delete_smtype(hffi_smtype* type);
  * @param msg: the error msg if create struct failed.
  * @return the struct pointer
  */
-hffi_struct* hffi_new_struct(hffi_smtype** member_types, sint16 parent_pos, char** msg);
-#define hffi_new_struct_simple(types, msg) hffi_new_struct(types, -1, msg)
+hffi_struct* hffi_new_struct(hffi_smtype** member_types, char** msg);
+hffi_struct* hffi_new_struct_abi(int abi,hffi_smtype** member_types, char** msg);
 
 /**
  * @brief hffi_new_struct_from_list: create struct with member types list.
+ * @param abi: the abi to match.
  * @param member_types: the member types. must ends with NULL elements.
  * @param parent_pos: the position of parent struct.
  * @param msg: the error msg if create struct failed.
  * @return the struct pointer
  */
-hffi_struct* hffi_new_struct_from_list(struct array_list* member_types, sint16 parent_pos, char** msg);
-
-hffi_struct* hffi_new_struct_from_harray(struct harray* array, sint16 parent_pos, char** msg);
+hffi_struct* hffi_new_struct_from_list2(int abi,struct array_list* member_types, char** msg);
+hffi_struct* hffi_new_struct_from_list(struct array_list* member_types, char** msg);
 
 /**
  * @brief hffi_new_struct_base:create struct by base types. except struct or its' pointer.

@@ -33,13 +33,13 @@ void hffi_test_struct(){
     arr[0] = t_float;
     arr[1] = t_ul;
     arr[2] = NULL;
-    hffi_struct* s_param = hffi_new_struct_simple(arr, msg);
+    hffi_struct* s_param = hffi_new_struct(arr, msg);
     if(s_param == NULL){
         printf("%s\n", msg);
         goto failed;
     }
     hffi_manager_add_struct(m, s_param);
-    hffi_struct* s_return = hffi_new_struct_simple(arr, msg);
+    hffi_struct* s_return = hffi_new_struct(arr, msg);
     if(s_return == NULL){
         printf("%s\n", msg);
         goto failed;
@@ -91,13 +91,13 @@ void hffi_test_struct2(){
     arr[0] = t_float;
     arr[1] = t_ul;
     arr[2] = NULL;
-    hffi_struct* s_param = hffi_new_struct_simple(arr, msg);
+    hffi_struct* s_param = hffi_new_struct(arr, msg);
     if(s_param == NULL){
         printf("%s\n", msg);
         goto failed;
     }
     hffi_manager_add_struct(m, s_param);
-    hffi_struct* s_return = hffi_new_struct_simple(arr, msg);
+    hffi_struct* s_return = hffi_new_struct(arr, msg);
     if(s_return == NULL){
         printf("%s\n", msg);
         goto failed;
@@ -154,13 +154,13 @@ void hffi_test_struct3(){
     arr[0] = t_float;
     arr[1] = t_ul;
     arr[2] = NULL;
-    hffi_struct* s_param = hffi_new_struct_simple(arr, msg);
+    hffi_struct* s_param = hffi_new_struct(arr, msg);
     if(s_param == NULL){
         printf("%s\n", msg);
         goto failed;
     }
     hffi_manager_add_struct(m, s_param);
-    hffi_struct* s_return = hffi_new_struct_simple(arr, msg);
+    hffi_struct* s_return = hffi_new_struct(arr, msg);
     if(s_return == NULL){
         printf("%s\n", msg);
         goto failed;

@@ -11,7 +11,7 @@ static inline void __grow(array_list* list, int minCapacity){
        newCapacity = minCapacity;
    //
     list->max_count = newCapacity;
-    void* new_data = h_alloctor_realloc(list->data, sizeof (void*) * newCapacity);
+    void* new_data = REALLOC(list->data, sizeof (void*) * newCapacity);
     if(new_data == NULL){
         void** old = list->data;
         list->data = MALLOC(sizeof (void*) * newCapacity);

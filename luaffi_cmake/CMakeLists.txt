@@ -18,6 +18,8 @@ add_executable(luaffi_app
     h_alloctor.c
     atomic.h
     atomic.c
+    h_string.h
+    h_string.c
     h_array.h
     h_array.c
     h_list.h

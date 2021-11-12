@@ -4,12 +4,10 @@
 #include "dym_loader.h"
 #include "h_list.h"
 #include "h_alloctor.h"
+#include "h_array.h"
+#include "h_string.h"
 
-typedef struct BasePair{
-    const char* name;
-    sint8 type;
-}BasePair;
-
+#define _UNKNOWN_ "_unknown_"
 #define __STR(s) #s
 
 #define REG_CLASS(L, C)                             \
@@ -22,13 +20,14 @@ typedef struct BasePair{
     } while (0)
 
 #define push_ptr(T) \
-void push_ptr_##T(lua_State* L, T* ptr) {\
+int push_ptr_##T(lua_State* L, T* ptr) {\
     *(T**)lua_newuserdata(L, sizeof(T*)) = ptr;\
     luaL_getmetatable(L, __STR(T));\
     lua_setmetatable(L, -2);\
+    return 1;\
 }
 #define get_ptr(T)\
-T* get_ref_##T(lua_State* L, int index) {\
+T* get_ptr_##T(lua_State* L, int index) {\
     return *(T**)luaL_checkudata(L, index, __STR(T));\
 }
 #define DEF_HFFI_PUSH_GET(t) \
@@ -40,7 +39,13 @@ DEF_HFFI_PUSH_GET(dym_func)
 DEF_HFFI_PUSH_GET(hffi_value)
 DEF_HFFI_PUSH_GET(hffi_struct)
 DEF_HFFI_PUSH_GET(hffi_cif)
+DEF_HFFI_PUSH_GET(hffi_smtype)
+DEF_HFFI_PUSH_GET(harray)
 
+typedef struct BasePair{
+    const char* name;
+    sint8 type;
+}BasePair;
 static const BasePair _BASE_PAIRS[] = {
     {"sint8", HFFI_TYPE_SINT8},
     {"uint8", HFFI_TYPE_UINT8},
@@ -50,9 +55,9 @@ static const BasePair _BASE_PAIRS[] = {
     {"uint32", HFFI_TYPE_UINT32},
     {"sint64", HFFI_TYPE_SINT64},
     {"uint64", HFFI_TYPE_UINT64},
-
     {"float", HFFI_TYPE_FLOAT},
     {"double", HFFI_TYPE_DOUBLE},
+
     {"void", HFFI_TYPE_VOID},
     {"pointer", HFFI_TYPE_POINTER},
 
@@ -62,9 +67,15 @@ static const BasePair _BASE_PAIRS[] = {
     {"long", HFFI_TYPE_SINT64},
     {"int", HFFI_TYPE_SINT32},
     {"uint", HFFI_TYPE_UINT32},
+
     {"string", HFFI_TYPE_STRING},
     {NULL, 0},
 };
+
+/**
+---------- harray->hffi_smtype->hffi_value-> hffi_struct-> hffi_cif
+---------- dym_lib->dym_func -------
+  */
 //-------------- share funcs --------------
 static void smtype_delete(void* d){
     hffi_delete_smtype((hffi_smtype*)d);
@@ -75,7 +86,291 @@ static void string_delete(void* d){
 static void value_delete(void* d){
     hffi_delete_value((hffi_value*)d);
 }
-//----------------- struct -------------
+//static void __harray_delete(void* d){
+//    harray_delete((harray*)d);
+//}
+//static void __struct_delete(void* d){
+//    hffi_delete_struct((hffi_struct*)d);
+//}
+//------------------- harray --------------------
+
+#define _harray_index_impl_int(hffi_t, type)\
+case hffi_t:{\
+    union harray_ele ele;\
+    if(harray_geti(arr, index, &ele)== HFFI_STATE_OK){\
+        lua_pushinteger(L, ele._##type);\
+        return 1;\
+    }\
+    return 0;\
+}break;
+
+#define _harray_index_impl_f(hffi_t, type)\
+case hffi_t:{\
+    union harray_ele ele;\
+    if(harray_geti(arr, index, &ele)== HFFI_STATE_OK){\
+        lua_pushnumber(L, ele._##type);\
+        return 1;\
+    }\
+    return 0;\
+}break;
+
+#define _harray_newindex_impl_int(hffi_t, type)\
+case hffi_t:{\
+    union harray_ele ele;\
+    ele._##type = (type)lua_tointeger(L, -1);\
+    if(harray_seti(arr, index, &ele) == HFFI_STATE_OK){\
+       return 0;\
+    }\
+    return luaL_error(L, "wrong index.");\
+}break;
+
+#define _harray_newindex_impl_f(hffi_t, type)\
+case hffi_t:{\
+    union harray_ele ele;\
+    ele._##type = (type)lua_tonumber(L, -1);\
+    if(harray_seti(arr, index, &ele) == HFFI_STATE_OK){\
+       return 0;\
+    }\
+    return luaL_error(L, "wrong index.");\
+}break;
+
+static int xffi_harray_gc(lua_State* L){
+    harray* arr = get_ptr_harray(L, 1);
+    harray_delete(arr);
+    return 0;
+}
+
+static int xffi_harray_index(lua_State* L){
+    //tab, i
+    harray* arr = get_ptr_harray(L, 1);
+    int index = luaL_checkinteger(L, 2);
+    switch (arr->hffi_t) {
+     _harray_index_impl_int(HFFI_TYPE_SINT8, sint8)
+     _harray_index_impl_int(HFFI_TYPE_UINT8, uint8)
+     _harray_index_impl_int(HFFI_TYPE_SINT16, sint16)
+     _harray_index_impl_int(HFFI_TYPE_UINT16, uint16)
+     _harray_index_impl_int(HFFI_TYPE_SINT32, sint32)
+     _harray_index_impl_int(HFFI_TYPE_UINT32, uint32)
+     _harray_index_impl_int(HFFI_TYPE_SINT64, sint64)
+     _harray_index_impl_int(HFFI_TYPE_UINT64, uint64)
+     _harray_index_impl_int(HFFI_TYPE_INT, sint32)
+
+     _harray_index_impl_f(HFFI_TYPE_FLOAT, float)
+     _harray_index_impl_f(HFFI_TYPE_DOUBLE, double)
+
+     case HFFI_TYPE_HARRAY:
+     case HFFI_TYPE_HARRAY_PTR:{
+         union harray_ele ele;
+         if(harray_geti(arr, index, &ele) == HFFI_STATE_OK){
+            return push_ptr_harray(L, (harray*)ele._extra);
+         }
+         return 0;
+     }break;
+     case HFFI_TYPE_STRUCT_PTR:
+     case HFFI_TYPE_STRUCT:{
+         union harray_ele ele;
+         if(harray_geti(arr, index, &ele) == HFFI_STATE_OK){
+            return push_ptr_hffi_struct(L, (hffi_struct*)ele._extra);
+         }
+         return 0;
+     }break;
+
+    }
+    return luaL_error(L, "unsupport data type for get index data from harray.");
+}
+static int xffi_harray_newindex(lua_State* L){
+    if(lua_type(L, 2) == LUA_TSTRING){
+        const char* fun_name = lua_tostring(L, 2);
+        if(strcmp(fun_name, "set") == 0){
+            //tab, str, {index,data}
+            if(lua_type(L, 3) != LUA_TTABLE || lua_rawlen(L, 3) < 2){
+                return luaL_error(L, "call set method for harray. must build a table which contains index and data.");
+            }
+            lua_rawgeti(L, -1, 1);//array, str, {index,data}, index
+            lua_rawgeti(L, -2, 2);//array, str, {index,data}, index, data
+            lua_remove(L, 2);
+            lua_remove(L, 2);     //array, index, data
+            return xffi_harray_newindex(L);
+        }
+        return luaL_error(L, "unsupport method('%s') for harray.", fun_name);
+    }
+    //tab, i, val(single or table)
+    harray* arr = get_ptr_harray(L, -3);
+    int index = luaL_checkinteger(L, -2);
+    if(lua_type(L, -1) == LUA_TTABLE){
+        int c = lua_rawlen(L, -1);
+        lua_pushvalue(L, -3); // harray
+        lua_pushvalue(L, -3); // index
+        for(int i = 0 ; i < c ; i ++){
+            lua_rawgeti(L, -3, i + 1); //sub element
+            lua_pushinteger(L, index + i);
+            lua_replace(L, -3);        //replace index and pop
+            //array, index, data
+            xffi_harray_newindex(L);
+            lua_pop(L, 1);
+        }
+        return 0;
+    }else{
+        //int ot float
+        switch (arr->hffi_t) {
+        _harray_newindex_impl_int(HFFI_TYPE_SINT8, sint8)
+        _harray_newindex_impl_int(HFFI_TYPE_UINT8, uint8)
+        _harray_newindex_impl_int(HFFI_TYPE_SINT16, sint16)
+        _harray_newindex_impl_int(HFFI_TYPE_UINT16, uint16)
+        _harray_newindex_impl_int(HFFI_TYPE_SINT32, sint32)
+        _harray_newindex_impl_int(HFFI_TYPE_UINT32, uint32)
+        _harray_newindex_impl_int(HFFI_TYPE_SINT64, sint64)
+        _harray_newindex_impl_int(HFFI_TYPE_UINT64, uint64)
+        _harray_newindex_impl_int(HFFI_TYPE_INT, sint32)
+
+        _harray_newindex_impl_f(HFFI_TYPE_FLOAT, float)
+        _harray_newindex_impl_f(HFFI_TYPE_DOUBLE, double)
+
+        case HFFI_TYPE_HARRAY:
+        case HFFI_TYPE_HARRAY_PTR:{
+            union harray_ele ele;
+            ele._extra = luaL_checkudata(L, -1, __STR(harray));
+            if(harray_seti(arr, index, &ele) == HFFI_STATE_OK){
+               return 0;
+            }
+            return luaL_error(L, "wrong index or data.");
+        }break;
+        case HFFI_TYPE_STRUCT_PTR:
+        case HFFI_TYPE_STRUCT:{
+            union harray_ele ele;
+            ele._extra = luaL_checkudata(L, -1, __STR(hffi_struct));
+            if(harray_seti(arr, index, &ele) == HFFI_STATE_OK){
+               return 0;
+            }
+            return luaL_error(L, "wrong index or data.");
+        }break;
+        }
+    }
+    return luaL_error(L, "wrong element type for __newindex(harray)!");
+}
+static int xffi_harray_len(lua_State* L){
+    harray* arr = get_ptr_harray(L, 1);
+    lua_pushinteger(L, harray_get_count(arr));
+    return 1;
+}
+static int xffi_harray_tostring(lua_State* L){
+    harray* arr = get_ptr_harray(L, 1);
+    hstring* hs = hstring_new();
+    harray_dump(arr, hs);
+    lua_pushstring(L, hstring_tostring(hs));
+    hstring_delete(hs);
+    return 1;
+}
+
+static int xffi_harray_new(lua_State* L){
+    if(lua_gettop(L) < 1){
+        return luaL_error(L, "create harray need [type & count]/[harray...]/[struct...].");
+    }
+    int type_1 = lua_type(L, 1);
+    //type, count.
+    if(type_1 == LUA_TNUMBER){
+        if(lua_gettop(L) != 2){
+            return luaL_error(L, "create harray need [type & count]/[harray...]/[struct...].");
+        }
+        int c = luaL_checkinteger(L, 2);
+        harray* arr = harray_new(luaL_checkinteger(L, 1), c);
+        return push_ptr_harray(L, arr);
+    }else if(type_1 == LUA_TTABLE){
+        //table(harray/struct...), bool
+        int c = lua_rawlen(L, 1);
+        int asPtr = 0;
+        if(lua_gettop(L) >= 2){
+            asPtr = lua_toboolean(L, 2);
+        }
+        //do userdatas
+        array_list* list = array_list_new2(c * 4 / 3 + 1);
+        lua_rawgeti(L, 1, 1);
+        if(luaL_testudata(L, -1, __STR(harray))){
+            array_list_add(list, get_ptr_harray(L, -1));
+            lua_pop(L, 1);
+            for(int i = 1 ; i < c ; i ++){
+                lua_rawgeti(L, 1, i + 1);
+                if(luaL_testudata(L, -1, __STR(harray))){
+                    array_list_add(list, get_ptr_harray(L, -1));
+                }else{
+                    array_list_delete2(list, NULL);
+                    return luaL_error(L, "create harray for arrays. we need only harray.");
+                }
+                lua_pop(L, 1);
+            }
+            //prepare out harray
+            harray* arr;
+            if(asPtr){
+                 arr = harray_new_array_ptr(c);
+                 //set data
+                 union harray_ele ele;
+                 for(int i = 0 ; i < c ; i ++){
+                     ele._extra = array_list_get(list, i);
+                     harray_seti(arr, i, &ele);
+                 }
+            }else{
+                arr = harray_new_arrays(list);
+            }
+            array_list_delete2(list, NULL);
+            return push_ptr_harray(L, arr);
+
+        }else if(luaL_testudata(L, -1, __STR(hffi_struct))){
+            array_list_add(list, get_ptr_hffi_struct(L, -1));
+            lua_pop(L, 1);
+            for(int i = 1 ; i < c ; i ++){
+                lua_rawgeti(L, 1, i + 1);
+                if(luaL_testudata(L, -1, __STR(hffi_struct))){
+                    array_list_add(list, get_ptr_hffi_struct(L, -1));
+                }else{
+                    array_list_delete2(list, NULL);
+                    return luaL_error(L, "create harray for structs. we need only 'hffi_struct'.");
+                }
+                lua_pop(L, 1);
+            }
+            harray* arr;
+            if(asPtr){
+                arr = harray_new_array_ptr(c);
+                //set data
+                union harray_ele ele;
+                for(int i = 0 ; i < c ; i ++){
+                    ele._extra = array_list_get(list, i);
+                    harray_seti(arr, i, &ele);
+                }
+            }else{
+                arr = harray_new_structs(list);
+            }
+            array_list_delete2(list, NULL);
+            return push_ptr_harray(L, arr);
+        }else{
+            array_list_delete2(list, NULL);
+            return luaL_error(L, "unsupport args for create harray. need [type & count]/[harray...]/[struct...].");
+        }
+    }
+    return luaL_error(L, "unsupport args for create harray. need [type & count]/[harray...]/[struct...].");
+}
+
+static const luaL_Reg g_harray_Methods[] = {
+    {"__gc", xffi_harray_gc},
+    {"__index", xffi_harray_index},
+    {"__newindex", xffi_harray_newindex},
+    {"__len", xffi_harray_len},
+    {"__tostring", xffi_harray_tostring},
+    {NULL, NULL}
+};
+
+//------------------ smtype ----------------------
+
+static int xffi_smtype_gc(lua_State* L){
+    hffi_smtype* hs = get_ptr_hffi_smtype(L, 1);
+    hffi_delete_smtype(hs);
+    return 0;
+}
+
+static const luaL_Reg g_hffi_smtype_Methods[] = {
+    {"__gc", xffi_smtype_gc},
+    {NULL, NULL}
+};
+//----------------- struct ---------------
 static inline int get_base_type(const char* name){
     const BasePair *lib;
     for (lib = _BASE_PAIRS; lib->name; lib++) {
@@ -112,7 +407,7 @@ static int xffi_struct_new(lua_State *L){
             array_list_add(sm_list, hffi_new_smtype_base(sm_type));
         }else{
             if(luaL_testudata(L, -2, __STR(hffi_struct)) != 0){
-                array_list_add(sm_list, hffi_new_smtype_struct(get_ref_hffi_struct(L, -2)));
+                array_list_add(sm_list, hffi_new_smtype_struct(get_ptr_hffi_struct(L, -2)));
             }else{
                 array_list_delete2(sm_list, smtype_delete);
                 array_list_delete2(sm_names, string_delete);
@@ -127,7 +422,7 @@ static int xffi_struct_new(lua_State *L){
     char* msg[1];
     msg[0] = _m;
     //create struct
-    hffi_struct* _struct = hffi_new_struct_from_list(sm_list, -1, msg);
+    hffi_struct* _struct = hffi_new_struct_from_list(sm_list, msg);
     array_list_delete2(sm_list, smtype_delete);
     push_ptr_hffi_struct(L, _struct);
     lua_pushlightuserdata(L, sm_names);
@@ -135,7 +430,7 @@ static int xffi_struct_new(lua_State *L){
     return 1;
 }
 static int xffi_struct_gc(lua_State *L){
-    hffi_struct* _struct = get_ref_hffi_struct(L, -1);
+    hffi_struct* _struct = get_ptr_hffi_struct(L, -1);
     lua_getuservalue(L, -1);
     array_list* sm_names = (array_list*)lua_topointer(L, -1);
     hffi_delete_struct(_struct);
@@ -197,7 +492,7 @@ static int xffi_value_new(lua_State *L){
         sint8 type = (sint8)lua_tointeger(L, 1);
         //pointer,struct
         if(type == HFFI_TYPE_POINTER && c >= 2 && luaL_testudata(L, 2, __STR(hffi_struct))){
-            val = hffi_new_value_struct_ptr(get_ref_hffi_struct(L, 2));
+            val = hffi_new_value_struct_ptr(get_ptr_hffi_struct(L, 2));
         }else{
             val = hffi_new_value_raw_type(type);
             if(c >= 2 && __hffi_value_set(val, L, 2) == 0){
@@ -208,7 +503,7 @@ static int xffi_value_new(lua_State *L){
         return 1;
     }else if(luaL_testudata(L, 1, __STR(hffi_struct))){
        //struct[, is_pointer]
-       hffi_struct* stru = get_ref_hffi_struct(L, 1);
+       hffi_struct* stru = get_ptr_hffi_struct(L, 1);
        if(c >= 2 && lua_toboolean(L, 2)){
             val = hffi_new_value_struct_ptr(stru);
        }else{
@@ -220,7 +515,7 @@ static int xffi_value_new(lua_State *L){
     return luaL_error(L, "new value only support: 'base_type[, val]' or 'struct[, is_pointer]'");
 }
 static int xffi_value_gc(lua_State *L){
-    hffi_value* val = get_ref_hffi_value(L, 1);
+    hffi_value* val = get_ptr_hffi_value(L, 1);
     hffi_delete_value(val);
     return 0;
 }
@@ -231,7 +526,7 @@ static const luaL_Reg g_hffi_value_Methods[] = {
 };
 //------------------- dym_func ------------
 static int xffi_dym_func_gc(lua_State *L){
-    dym_func* func = get_ref_dym_func(L, -1);
+    dym_func* func = get_ptr_dym_func(L, -1);
     dym_delete_func(func);
     return 0;
 }
@@ -253,8 +548,8 @@ case ft:{\
 
 static int xffi_dym_func_call(lua_State *L){
     //func, cif
-    dym_func* func = get_ref_dym_func(L, 1);
-    hffi_cif* cif = get_ref_hffi_cif(L, -1);
+    dym_func* func = get_ptr_dym_func(L, 1);
+    hffi_cif* cif = get_ptr_hffi_cif(L, -1);
     hffi_cif_call(cif, func->func_ptr);
     hffi_struct* stru = hffi_value_get_struct(cif->out);
     if(stru != NULL){
@@ -297,13 +592,13 @@ static const luaL_Reg g_dym_func_Methods[] = {
 //------------------ dym_lib ----------------------------
 
 static int xffi_dym_lib_gc(lua_State *L){
-    dym_lib* lib = get_ref_dym_lib(L, -1);
+    dym_lib* lib = get_ptr_dym_lib(L, -1);
     dym_delete_lib(lib);
     return 0;
 }
 static int xffi_dym_lib_index(lua_State *L){
     // lib , name
-    dym_lib* lib = get_ref_dym_lib(L, 1);
+    dym_lib* lib = get_ptr_dym_lib(L, 1);
     dym_func* func = dym_lib_get_function(lib, luaL_checkstring(L, 2));
     if(func == NULL){
         lua_getuservalue(L, 1);
@@ -314,7 +609,7 @@ static int xffi_dym_lib_index(lua_State *L){
     return 1;
 }
 static int xffi_dym_lib_toString(lua_State *L){
-     //dym_lib* lib = get_ref_dym_lib(L, 1);
+     //dym_lib* lib = get_ptr_dym_lib(L, 1);
      lua_getuservalue(L, 1);
      return 1;
 }
@@ -337,7 +632,7 @@ static int xffi_dym_lib_new(lua_State *L){
 //--------------------- cif -------------------
 
 static int xffi_cif_gc(lua_State *L){
-    hffi_cif* cif = get_ref_hffi_cif(L, 1);
+    hffi_cif* cif = get_ptr_hffi_cif(L, 1);
     hffi_delete_cif(cif);
     return 0;
 }
@@ -351,11 +646,11 @@ static inline hffi_value* __get_value(lua_State *L, int idx){
     if(lua_type(L, idx) == LUA_TNUMBER){
         return hffi_new_value_raw_type(lua_tointeger(L, idx));
     }else if(luaL_testudata(L, idx, __STR(hffi_struct)) != 0){
-        hffi_struct* _struct = get_ref_hffi_struct(L, idx);
+        hffi_struct* _struct = get_ptr_hffi_struct(L, idx);
         return hffi_new_value_struct(_struct);
         //how to support struct pointer? recommend use value.
     }else if(luaL_testudata(L, idx, __STR(hffi_value)) != 0){
-        hffi_value* val = get_ref_hffi_value(L, idx);
+        hffi_value* val = get_ptr_hffi_value(L, idx);
         hffi_value_ref(val, 1);
         return val;
     }else{
@@ -451,6 +746,8 @@ LUAMOD_API void register_ffi(lua_State *L){
     REG_CLASS(L, hffi_value);
     REG_CLASS(L, hffi_struct);
     REG_CLASS(L, hffi_cif);
+    REG_CLASS(L, hffi_smtype);
+    REG_CLASS(L, harray);
 
     lua_newtable(L);
     lua_pushvalue(L, -1);
@@ -463,5 +760,6 @@ LUAMOD_API void register_ffi(lua_State *L){
     setfield_function(L, "struct", xffi_struct_new);   
     setfield_function(L, "cif", xffi_cif);
     setfield_function(L, "newValue", xffi_value_new);
+    setfield_function(L, "newArray", xffi_harray_new);
     lua_pop(L, 1);
 }

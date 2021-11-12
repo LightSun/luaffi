@@ -4,6 +4,7 @@
 #include "hffi_common.h"
 
 struct array_list;
+struct hstring;
 /**
   the base type array
   */
@@ -54,6 +55,6 @@ void harray_ref(harray* arr, int c);
 
 int harray_geti(harray* arr, int index, union harray_ele* ptr);
 int harray_seti(harray* arr, int index, union harray_ele* ptr);
-//int harray_geti_lua(harray* arr, int index, struct lua_State* L);
+void harray_dump(harray* arr, struct hstring* hs);
 
 #endif // H_ARRAY_H

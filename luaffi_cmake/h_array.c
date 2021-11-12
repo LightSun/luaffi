@@ -4,6 +4,7 @@
 #include "atomic.h"
 #include "h_alloctor.h"
 #include "h_list.h"
+#include "h_string.h"
 
 typedef struct _Data{
     int index;
@@ -172,8 +173,8 @@ int harray_geti(harray* arr, int index, union harray_ele* ptr){
             if(data){
                 ptr->_extra = ((_Data*)data)->_extra;
                 //printf("get harray: index = %d, arr_addr = %p\n", index, ptr->_extra);
+                return HFFI_STATE_OK;
             }
-            return HFFI_STATE_OK;
         }break;
 
         case HFFI_TYPE_HARRAY:{
@@ -191,7 +192,7 @@ int harray_geti(harray* arr, int index, union harray_ele* ptr){
 
         case HFFI_TYPE_STRUCT:{
             //find old
-            void *data =  array_list_find(arr->ele_list, __find_ele_by_index, &index);
+            void *data = array_list_find(arr->ele_list, __find_ele_by_index, &index);
             if(data){
                 ptr->_extra = ((_Data*)data)->_extra;
                 int target_size = hffi_struct_get_data_size((struct hffi_struct*)ptr->_extra);
@@ -229,6 +230,9 @@ int harray_seti(harray* arr, int index, union harray_ele* ptr){
     __SET_I(HFFI_TYPE_INT, sint32)
 
     case HFFI_TYPE_HARRAY_PTR:{
+        if(ptr->_extra == NULL){
+            return HFFI_STATE_FAILED;
+        }
         //printf("put harray: index = %d, arr_addr = %p\n", index, ptr->_extra);
         //set data and ref
         harray_ref((harray*)ptr->_extra, 1);
@@ -242,6 +246,9 @@ int harray_seti(harray* arr, int index, union harray_ele* ptr){
         return HFFI_STATE_OK;
     }break;
     case HFFI_TYPE_STRUCT_PTR:{
+        if(ptr->_extra == NULL){
+            return HFFI_STATE_FAILED;
+        }
         hffi_struct_ref((struct hffi_struct*)ptr->_extra, 1);
         void** data = arr->data;
         data[index] = hffi_struct_get_data((struct hffi_struct*)ptr->_extra);
@@ -253,6 +260,9 @@ int harray_seti(harray* arr, int index, union harray_ele* ptr){
     }break;
 
     case HFFI_TYPE_HARRAY:{
+        if(ptr->_extra == NULL){
+            return HFFI_STATE_FAILED;
+        }
         //must provide an array to copy daya.
         int target_size = ((harray*)ptr->_extra)->data_size;
         if(target_size != arr->data_size / arr->ele_count){
@@ -263,6 +273,9 @@ int harray_seti(harray* arr, int index, union harray_ele* ptr){
         return HFFI_STATE_OK;
     }break;
     case HFFI_TYPE_STRUCT:{
+        if(ptr->_extra == NULL){
+            return HFFI_STATE_FAILED;
+        }
         int target_size = hffi_struct_get_data_size((struct hffi_struct*)ptr->_extra);
         if(target_size != arr->data_size / arr->ele_count){
             return HFFI_STATE_FAILED;
@@ -273,4 +286,45 @@ int harray_seti(harray* arr, int index, union harray_ele* ptr){
     }break;
     }
     return HFFI_STATE_FAILED;
+}
+
+#define harray_dump_impl(hffi_t, type, format)\
+case hffi_t:{\
+    for(int i = 0 ; i < arr->ele_count ; i ++){\
+        if(i != 0){hstring_append(hs, ", ");}\
+        hstring_appendf(hs, format, ((type*)arr->data)[i]);\
+    }\
+}break;
+
+void harray_dump(harray* arr, struct hstring* hs){
+    hstring_append(hs, "[");
+    switch (arr->hffi_t) {
+    harray_dump_impl(HFFI_TYPE_SINT8, sint8, "%d");
+    harray_dump_impl(HFFI_TYPE_UINT8, uint8, "%d");
+    harray_dump_impl(HFFI_TYPE_SINT16, sint16, "%d");
+    harray_dump_impl(HFFI_TYPE_UINT16, uint16, "%u");
+    harray_dump_impl(HFFI_TYPE_SINT32, sint32, "%d");
+    harray_dump_impl(HFFI_TYPE_UINT32, uint32, "%u");
+    harray_dump_impl(HFFI_TYPE_SINT64, sint64, "%lld");
+    harray_dump_impl(HFFI_TYPE_UINT64, uint64, "%llu");
+    harray_dump_impl(HFFI_TYPE_INT, sint32, "%d");
+
+    case HFFI_TYPE_HARRAY:
+    case HFFI_TYPE_HARRAY_PTR:{
+        union harray_ele ele;
+        for(int i = 0 ; i < arr->ele_count ; i ++){
+            harray_seti(arr, i, &ele);
+            if(i != 0){hstring_append(hs, ", ");}
+            harray_dump(ele._extra, hs);
+        }
+    }break;
+    //TODO latter support struct
+    case HFFI_TYPE_STRUCT:{
+         hstring_append(hs, "<struct>");
+    }break;
+    case HFFI_TYPE_STRUCT_PTR:{
+        hstring_append(hs, "<struct_ptr>");
+    }break;
+    }
+    hstring_append(hs, "]");
 }

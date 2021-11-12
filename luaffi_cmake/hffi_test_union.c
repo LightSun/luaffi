@@ -63,12 +63,12 @@ void test_call_union1(int hffi_t,void* fn, void (*Func_post)(hffi_value*)){
     arr[0] = t_double;
     arr[1] = NULL;
     //create struct to mock union
-    hffi_struct* s_param = hffi_new_struct_simple(arr, msg);
+    hffi_struct* s_param = hffi_new_struct(arr, msg);
     if(s_param == NULL){
         goto failed;
     }
     hffi_manager_add_struct(m, s_param);
-    hffi_struct* s_ret = hffi_new_struct_simple(arr, msg);
+    hffi_struct* s_ret = hffi_new_struct(arr, msg);
     if(s_ret == NULL){
         goto failed;
     }
