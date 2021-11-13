@@ -134,13 +134,97 @@ case hffi_t:{\
     return luaL_error(L, "wrong index.");\
 }break;
 
+//-1, is value
+static inline int __harray_set_vals(lua_State* L, harray* arr, int index){
+    //int ot float
+    switch (arr->hffi_t) {
+    _harray_newindex_impl_int(HFFI_TYPE_SINT8, sint8)
+    _harray_newindex_impl_int(HFFI_TYPE_UINT8, uint8)
+    _harray_newindex_impl_int(HFFI_TYPE_SINT16, sint16)
+    _harray_newindex_impl_int(HFFI_TYPE_UINT16, uint16)
+    _harray_newindex_impl_int(HFFI_TYPE_SINT32, sint32)
+    _harray_newindex_impl_int(HFFI_TYPE_UINT32, uint32)
+    _harray_newindex_impl_int(HFFI_TYPE_SINT64, sint64)
+    _harray_newindex_impl_int(HFFI_TYPE_UINT64, uint64)
+    _harray_newindex_impl_int(HFFI_TYPE_INT, sint32)
+
+    _harray_newindex_impl_f(HFFI_TYPE_FLOAT, float)
+    _harray_newindex_impl_f(HFFI_TYPE_DOUBLE, double)
+
+    case HFFI_TYPE_HARRAY:
+    case HFFI_TYPE_HARRAY_PTR:{
+        union harray_ele ele;
+        ele._extra = luaL_checkudata(L, -1, __STR(harray));
+        if(harray_seti(arr, index, &ele) == HFFI_STATE_OK){
+           return 0;
+        }
+        return luaL_error(L, "wrong index or data.");
+    }break;
+    case HFFI_TYPE_STRUCT_PTR:
+    case HFFI_TYPE_STRUCT:{
+        union harray_ele ele;
+        ele._extra = luaL_checkudata(L, -1, __STR(hffi_struct));
+        if(harray_seti(arr, index, &ele) == HFFI_STATE_OK){
+           return 0;
+        }
+        return luaL_error(L, "wrong index or data.");
+    }break;
+    }
+    return 0;
+}
+
 static int xffi_harray_gc(lua_State* L){
     harray* arr = get_ptr_harray(L, 1);
     harray_delete(arr);
     return 0;
 }
-
+static int xffi_harray_newindex(lua_State* L){
+    //tab, i, val(single or table)
+    harray* arr = get_ptr_harray(L, -3);
+    int index = luaL_checkinteger(L, -2);
+    if(lua_type(L, -1) == LUA_TTABLE){
+        int c = lua_rawlen(L, -1);
+        if(c > arr->ele_count - index){
+            c = arr->ele_count - index;
+        }
+        lua_pushvalue(L, -3); // harray
+        lua_pushvalue(L, -3); // index
+        for(int i = 0 ; i < c ; i ++){
+            lua_rawgeti(L, -3, i + 1); //sub element
+            lua_pushinteger(L, index + i);
+            lua_replace(L, -3);        //replace index and pop
+            //array, index, data
+            xffi_harray_newindex(L);
+            lua_pop(L, 1);
+        }
+        return 0;
+    }else{
+        //int ot float
+        __harray_set_vals(L, arr, index);
+        return 0;
+    }
+    return luaL_error(L, "wrong element type for __newindex(harray)!");
+}
+static int __harray_func_set(lua_State* L){
+    //index, data
+    lua_pushvalue(L, lua_upvalueindex(1));
+    lua_insert(L, 1);
+    //ud, index, data
+    xffi_harray_newindex(L);
+    return 0;
+}
 static int xffi_harray_index(lua_State* L){
+    //may be eg: arr.set(1, {5, 6})
+    if(lua_type(L, 2) == LUA_TSTRING){
+        const char* fun_name = lua_tostring(L, 2);
+        if(strcmp(fun_name, "set") == 0){
+            //array, str
+            lua_pushvalue(L, 1);
+            lua_pushcclosure(L, __harray_func_set, 1);
+            return 1; //return a function
+        }
+        return luaL_error(L, "unsupport method('%s') for harray.", fun_name);
+    }
     //tab, i
     harray* arr = get_ptr_harray(L, 1);
     int index = luaL_checkinteger(L, 2);
@@ -178,76 +262,7 @@ static int xffi_harray_index(lua_State* L){
     }
     return luaL_error(L, "unsupport data type for get index data from harray.");
 }
-static int xffi_harray_newindex(lua_State* L){
-    if(lua_type(L, 2) == LUA_TSTRING){
-        const char* fun_name = lua_tostring(L, 2);
-        if(strcmp(fun_name, "set") == 0){
-            //tab, str, {index,data}
-            if(lua_type(L, 3) != LUA_TTABLE || lua_rawlen(L, 3) < 2){
-                return luaL_error(L, "call set method for harray. must build a table which contains index and data.");
-            }
-            lua_rawgeti(L, -1, 1);//array, str, {index,data}, index
-            lua_rawgeti(L, -2, 2);//array, str, {index,data}, index, data
-            lua_remove(L, 2);
-            lua_remove(L, 2);     //array, index, data
-            return xffi_harray_newindex(L);
-        }
-        return luaL_error(L, "unsupport method('%s') for harray.", fun_name);
-    }
-    //tab, i, val(single or table)
-    harray* arr = get_ptr_harray(L, -3);
-    int index = luaL_checkinteger(L, -2);
-    if(lua_type(L, -1) == LUA_TTABLE){
-        int c = lua_rawlen(L, -1);
-        lua_pushvalue(L, -3); // harray
-        lua_pushvalue(L, -3); // index
-        for(int i = 0 ; i < c ; i ++){
-            lua_rawgeti(L, -3, i + 1); //sub element
-            lua_pushinteger(L, index + i);
-            lua_replace(L, -3);        //replace index and pop
-            //array, index, data
-            xffi_harray_newindex(L);
-            lua_pop(L, 1);
-        }
-        return 0;
-    }else{
-        //int ot float
-        switch (arr->hffi_t) {
-        _harray_newindex_impl_int(HFFI_TYPE_SINT8, sint8)
-        _harray_newindex_impl_int(HFFI_TYPE_UINT8, uint8)
-        _harray_newindex_impl_int(HFFI_TYPE_SINT16, sint16)
-        _harray_newindex_impl_int(HFFI_TYPE_UINT16, uint16)
-        _harray_newindex_impl_int(HFFI_TYPE_SINT32, sint32)
-        _harray_newindex_impl_int(HFFI_TYPE_UINT32, uint32)
-        _harray_newindex_impl_int(HFFI_TYPE_SINT64, sint64)
-        _harray_newindex_impl_int(HFFI_TYPE_UINT64, uint64)
-        _harray_newindex_impl_int(HFFI_TYPE_INT, sint32)
 
-        _harray_newindex_impl_f(HFFI_TYPE_FLOAT, float)
-        _harray_newindex_impl_f(HFFI_TYPE_DOUBLE, double)
-
-        case HFFI_TYPE_HARRAY:
-        case HFFI_TYPE_HARRAY_PTR:{
-            union harray_ele ele;
-            ele._extra = luaL_checkudata(L, -1, __STR(harray));
-            if(harray_seti(arr, index, &ele) == HFFI_STATE_OK){
-               return 0;
-            }
-            return luaL_error(L, "wrong index or data.");
-        }break;
-        case HFFI_TYPE_STRUCT_PTR:
-        case HFFI_TYPE_STRUCT:{
-            union harray_ele ele;
-            ele._extra = luaL_checkudata(L, -1, __STR(hffi_struct));
-            if(harray_seti(arr, index, &ele) == HFFI_STATE_OK){
-               return 0;
-            }
-            return luaL_error(L, "wrong index or data.");
-        }break;
-        }
-    }
-    return luaL_error(L, "wrong element type for __newindex(harray)!");
-}
 static int xffi_harray_len(lua_State* L){
     harray* arr = get_ptr_harray(L, 1);
     lua_pushinteger(L, harray_get_count(arr));
@@ -267,13 +282,24 @@ static int xffi_harray_new(lua_State* L){
         return luaL_error(L, "create harray need [type & count]/[harray...]/[struct...].");
     }
     int type_1 = lua_type(L, 1);
-    //type, count.
+    //type, count/simple values.
     if(type_1 == LUA_TNUMBER){
         if(lua_gettop(L) != 2){
             return luaL_error(L, "create harray need [type & count]/[harray...]/[struct...].");
         }
-        int c = luaL_checkinteger(L, 2);
-        harray* arr = harray_new(luaL_checkinteger(L, 1), c);
+        harray* arr;
+        if(lua_type(L, 2) == LUA_TNUMBER){
+            int c = luaL_checkinteger(L, 2);
+            arr = harray_new(luaL_checkinteger(L, 1), c);
+        }else{
+            int c = lua_rawlen(L, 2);
+            arr = harray_new(luaL_checkinteger(L, 1), c);
+            for(int i = 0 ; i < c; i ++){
+                lua_rawgeti(L, 2, i + 1); //type, tab, ele
+                __harray_set_vals(L, arr, i);
+                lua_pop(L, 1);
+            }
+        }
         return push_ptr_harray(L, arr);
     }else if(type_1 == LUA_TTABLE){
         //table(harray/struct...), bool
@@ -456,7 +482,7 @@ case ffi_t:{\
     *s = val;\
 }break;
 static inline int __hffi_value_set(hffi_value* hval, lua_State *L, int idx){
-    switch (hval->type->base_ffi_type) {
+    switch (hval->base_ffi_type) {
     VALUE_SET_IMPL(HFFI_TYPE_SINT8, sint8)
     VALUE_SET_IMPL(HFFI_TYPE_UINT8, uint8)
     VALUE_SET_IMPL(HFFI_TYPE_SINT16, sint16)
@@ -558,7 +584,7 @@ static int xffi_dym_func_call(lua_State *L){
         return 1;
     }
     //cast to lua
-    switch (cif->out->type->base_ffi_type) {
+    switch (cif->out->base_ffi_type) {
     case HFFI_TYPE_VOID:{return 0;}break;
 //    case HFFI_TYPE_SINT8:{
 //        sint8 val;

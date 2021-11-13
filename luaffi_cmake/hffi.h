@@ -2,7 +2,7 @@
 #include "hffi_common.h"
 
 #define hffi_new_value_auto_x_def(type) \
-hffi_value* hffi_new_value_##type(hffi_type* t, type val);
+hffi_value* hffi_new_value_##type(type val);
 
 #define hffi_value_get_auto_x_def(t)\
 int hffi_value_get_##t(hffi_value* val, t* out_ptr);
@@ -16,15 +16,9 @@ struct linklist_node;
 struct array_list;
 struct harray;
 
-typedef struct hffi_type{
+typedef struct hffi_value{
     int8_t base_ffi_type;        //see ffi.h
     int8_t pointer_base_type;    //the raw base type. eg: int** -> int
-    //int8_t pointer_level;      //the pointer level. eg: int** -> 2
-    int volatile ref;
-}hffi_type;
-
-typedef struct hffi_value{
-    hffi_type* type;
     int volatile ref;        //ref count
     void* ptr;               //may be data-ptr/struct-ptr/harray-ptr
     ffi_type* ffi_type;      //cache ffi_type
@@ -37,7 +31,7 @@ typedef struct hffi_smtype{
     sint8 ffi_type;
     void* _struct;                  //sometimes we may want put struct (hffi_struct*) directly.
     void* _harray;                  //sometimes we may want put harray(harray*) directly.
-    struct hffi_smtype** elements;  //child type
+    struct hffi_smtype** elements;  //child types
 }hffi_smtype;
 
 typedef struct hffi_struct{
@@ -70,12 +64,10 @@ typedef struct hffi_cif{
 
 typedef struct hffi_manager{
     struct linklist_node* values;
-    struct linklist_node* types;
     struct linklist_node* structs;
     struct linklist_node* smtypes;
     struct linklist_node* hcifs;
     int value_count;
-    int type_count;
     int struct_count;
     int smtype_count;
     int hcif_count;
@@ -86,15 +78,10 @@ typedef struct hffi_manager{
 //error_msg can be null
 ffi_type* to_ffi_type(int8_t ffi_t, char** error_msg);
 
-hffi_type* hffi_new_type(int8_t ffi_type, int8_t ptr_base_type);
-hffi_type* hffi_new_type_base(int8_t ffi_type);
-int hffi_type_size(hffi_type* val);
-void hffi_delete_type(hffi_type* t);
-
 //only alloc base needed memory.
-hffi_value* hffi_new_value_ptr(hffi_type* type);
+hffi_value* hffi_new_value_ptr(sint8 hffi_t2);
 //auto alloc memory for target size
-hffi_value* hffi_new_value_auto(hffi_type* type, int size);
+hffi_value* hffi_new_value(sint8 hffi_t1, sint8 hffi_t2, int size);
 hffi_new_value_auto_x_def(sint8)
 hffi_new_value_auto_x_def(sint16)
 hffi_new_value_auto_x_def(sint32)
@@ -213,7 +200,6 @@ hffi_struct* hffi_struct_copy(hffi_struct* _hs);
 hffi_manager* hffi_new_manager();
 void hffi_delete_manager(hffi_manager*);
 int hffi_manager_add_value(hffi_manager*, hffi_value* v);
-int hffi_manager_add_type(hffi_manager*, hffi_type* v);
 int hffi_manager_add_smtype(hffi_manager*, hffi_smtype* v);
 int hffi_manager_add_struct(hffi_manager*, hffi_struct* v);
 int hffi_manager_add_cif(hffi_manager* hm,hffi_cif* v);

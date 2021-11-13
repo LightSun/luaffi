@@ -16,11 +16,9 @@ int testFunc2_1(int* m, int n){
 }
 void hffi_test2(){
     printf("----------- hffi_test2 ---------- \n");
-    hffi_type* t1 = hffi_new_type(FFI_TYPE_POINTER, FFI_TYPE_SINT32);
-    hffi_type* t2 = hffi_new_type_base(FFI_TYPE_SINT32);
-    hffi_value* val1 = hffi_new_value_ptr(t1);
-    hffi_value* val2 = hffi_new_value_int(t2, 5);
-    hffi_value* out = hffi_new_value_int(t2, 0);
+    hffi_value* val1 = hffi_new_value_ptr(FFI_TYPE_SINT32);
+    hffi_value* val2 = hffi_new_value_int(5);
+    hffi_value* out = hffi_new_value_int(0);
 
     void* func = testFunc2_1;
 
@@ -48,17 +46,13 @@ void hffi_test2(){
     hffi_delete_value(val1);
     hffi_delete_value(val2);
     hffi_delete_value(out);
-    hffi_delete_type(t1);
-    hffi_delete_type(t2);
 }
 void hffi_test1(){
     printf("----------- hffi_test1 ---------- \n");
     //printf("hffi_test1: sizeof(int**) = %d, sizeof(int64*) = %d\n", sizeof(int**), sizeof(sint64*));
-    hffi_type* t1 = hffi_new_type(FFI_TYPE_POINTER, FFI_TYPE_SINT32);
-    hffi_type* t2 = hffi_new_type_base(FFI_TYPE_SINT32);
-    hffi_value* val1 = hffi_new_value_ptr(t1);
-    hffi_value* val2 = hffi_new_value_int(t2, 5);
-    hffi_value* out = hffi_new_value_int(t2, 0);
+    hffi_value* val1 = hffi_new_value_ptr(FFI_TYPE_SINT32);
+    hffi_value* val2 = hffi_new_value_int(5);
+    hffi_value* out = hffi_new_value_int(0);
 
     void* func = testFunc2_0;
 
@@ -87,6 +81,4 @@ void hffi_test1(){
     hffi_delete_value(val1);
     hffi_delete_value(val2);
     hffi_delete_value(out);
-    hffi_delete_type(t1);
-    hffi_delete_type(t2);
 }

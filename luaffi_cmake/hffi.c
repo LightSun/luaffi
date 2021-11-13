@@ -7,9 +7,9 @@
 #include "h_list.h"
 #include "h_array.h"
 
-#define hffi_new_value_auto_x(type) \
-hffi_value* hffi_new_value_##type(hffi_type* t, type val){\
-    hffi_value* v = hffi_new_value_auto(t, sizeof (type));\
+#define hffi_new_value_auto_x(ffi_t,type) \
+hffi_value* hffi_new_value_##type(type val){\
+    hffi_value* v = hffi_new_value(ffi_t, HFFI_TYPE_VOID,sizeof(type));\
     type* p = (type*)v->ptr;\
     *p = val;\
     return v;\
@@ -20,7 +20,7 @@ int hffi_value_get_##t(hffi_value* val, t* out_ptr){\
     char _m[128];\
     char* msg[1];\
     msg[0] = _m;\
-    ffi_type* ft = to_ffi_type(val->type->base_ffi_type, msg);\
+    ffi_type* ft = to_ffi_type(val->base_ffi_type, msg);\
     if(ft != NULL && ft->size >= sizeof(t)){\
        if(ft->size >= sizeof(t)){\
           *out_ptr = *((t*)val->ptr);\
@@ -127,87 +127,38 @@ ffi_type* to_ffi_type(int8_t v, char** msg){
     return NULL;
 }
 //---------------------------------------------------------------
-hffi_type* hffi_new_type_base(int8_t ffi_type){
-    hffi_type* ptr = MALLOC(sizeof (hffi_type));
-    ptr->base_ffi_type = ffi_type;
-    ptr->pointer_base_type = FFI_TYPE_VOID;
-    ptr->ref = 1;
-    return ptr;
-}
-hffi_type* hffi_new_type(int8_t ffi_type, int8_t ptr_base_type){
-    hffi_type* ptr = MALLOC(sizeof (hffi_type));
-    ptr->base_ffi_type = ffi_type;
-    ptr->pointer_base_type = ptr_base_type;
-    ptr->ref = 1;
-    return ptr;
-}
-int hffi_type_size(hffi_type* t){
-    //struct/harray size not known here.
-    if(t->base_ffi_type == FFI_TYPE_STRUCT || t->base_ffi_type == HFFI_TYPE_HARRAY){
-        return 0;
-    }
-    ffi_type* ft = to_ffi_type(t->base_ffi_type, NULL);
-    return ft ? ft->size : 0;
-}
-void hffi_delete_type(hffi_type* t){
-    int old = atomic_add(&t->ref, -1);
-    if(old == 1){
-        FREE(t);
-    }
-}
 //------------------------- value ------------------------
-hffi_value* hffi_new_value_ptr(hffi_type* type){
-    if(type->base_ffi_type != FFI_TYPE_POINTER) return NULL;
-#define INIT_MEM(t, s)\
-case t:{\
-    val_ptr->ptr = MALLOC(s);\
-}break;
-
+hffi_value* hffi_new_value_ptr(sint8 hffi_t2){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
-    switch (type->pointer_base_type) {
-        INIT_MEM(FFI_TYPE_SINT8, sizeof (sint8*))
-        INIT_MEM(FFI_TYPE_UINT8, sizeof (uint8*))
-        INIT_MEM(FFI_TYPE_SINT16, sizeof (sint16*))
-        INIT_MEM(FFI_TYPE_UINT16, sizeof (uint16*))
-        INIT_MEM(FFI_TYPE_SINT32, sizeof (sint32*))
-        INIT_MEM(FFI_TYPE_UINT32, sizeof (uint32*))
-        INIT_MEM(FFI_TYPE_SINT64, sizeof (sint64*))
-        INIT_MEM(FFI_TYPE_UINT64, sizeof (uint64*))
 
-        INIT_MEM(FFI_TYPE_INT, sizeof (sint32*))
-        INIT_MEM(FFI_TYPE_FLOAT, sizeof (float*))
-        INIT_MEM(FFI_TYPE_DOUBLE, sizeof (double*))
-        INIT_MEM(FFI_TYPE_VOID, sizeof (void*))
-    }
-    val_ptr->type = type;
+    val_ptr->ptr = MALLOC(sizeof (void*));
+    val_ptr->base_ffi_type = FFI_TYPE_POINTER;
+    val_ptr->pointer_base_type = hffi_t2;
     val_ptr->ref = 1;
-    atomic_add(&type->ref, 1);
     return val_ptr;
 }
-hffi_value* hffi_new_value_auto(hffi_type* type, int size){
+hffi_value* hffi_new_value(sint8 hffi_t, sint8 hffi_t2, int size){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
     val_ptr->ptr = MALLOC(size);
-    val_ptr->type = type;
-    val_ptr->ref = 1;
-    if(type){
-        atomic_add(&type->ref, 1);
-    }
+    val_ptr->base_ffi_type = hffi_t;
+    val_ptr->pointer_base_type = hffi_t2;
+    val_ptr->ref = 1;   
     return val_ptr;
 }
 
-hffi_new_value_auto_x(sint8)
-hffi_new_value_auto_x(sint16)
-hffi_new_value_auto_x(sint32)
-hffi_new_value_auto_x(sint64)
-hffi_new_value_auto_x(uint8)
-hffi_new_value_auto_x(uint16)
-hffi_new_value_auto_x(uint32)
-hffi_new_value_auto_x(uint64)
-hffi_new_value_auto_x(int)
-hffi_new_value_auto_x(float)
-hffi_new_value_auto_x(double)
+hffi_new_value_auto_x(HFFI_TYPE_SINT8, sint8)
+hffi_new_value_auto_x(HFFI_TYPE_SINT16, sint16)
+hffi_new_value_auto_x(HFFI_TYPE_SINT32, sint32)
+hffi_new_value_auto_x(HFFI_TYPE_SINT64, sint64)
+hffi_new_value_auto_x(HFFI_TYPE_UINT8, uint8)
+hffi_new_value_auto_x(HFFI_TYPE_UINT16, uint16)
+hffi_new_value_auto_x(HFFI_TYPE_UINT32, uint32)
+hffi_new_value_auto_x(HFFI_TYPE_UINT64, uint64)
+hffi_new_value_auto_x(HFFI_TYPE_INT, int)
+hffi_new_value_auto_x(HFFI_TYPE_FLOAT, float)
+hffi_new_value_auto_x(HFFI_TYPE_DOUBLE, double)
 
 hffi_value_get_auto_x(sint8)
 hffi_value_get_auto_x(sint16)
@@ -221,29 +172,43 @@ hffi_value_get_auto_x(int)
 hffi_value_get_auto_x(float)
 hffi_value_get_auto_x(double)
 
-hffi_value* hffi_new_value_raw_type(sint8 type){
-    hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
-    memset(val_ptr, 0, sizeof (hffi_value));
-    val_ptr->ptr = MALLOC(sizeof (void*));
-    val_ptr->type = hffi_new_type_base(type);
-    val_ptr->ref = 1;
-    return val_ptr;
+hffi_value* hffi_new_value_raw_type(sint8 ffi_t){
+    int size = 0;
+    switch (ffi_t) {
+    case HFFI_TYPE_SINT8:{size = sizeof (sint8);}break;
+    case HFFI_TYPE_UINT8:{size = sizeof (uint8);}break;
+    case HFFI_TYPE_SINT16:{size = sizeof (sint16);}break;
+    case HFFI_TYPE_UINT16:{size = sizeof (uint16);}break;
+    case HFFI_TYPE_SINT32:{size = sizeof (sint32);}break;
+    case HFFI_TYPE_UINT32:{size = sizeof (uint32);}break;
+    case HFFI_TYPE_SINT64:{size = sizeof (sint64);}break;
+    case HFFI_TYPE_UINT64:{size = sizeof (uint64);}break;
+    case HFFI_TYPE_FLOAT:{size = sizeof (float);}break;
+    case HFFI_TYPE_DOUBLE:{size = sizeof (double);}break;
+
+    case HFFI_TYPE_INT:{size = sizeof (sint32);}break;
+    default:
+        return NULL;
+    }
+    return hffi_new_value(ffi_t, HFFI_TYPE_VOID, size);
+    //return hffi_new_value(ffi_t, HFFI_TYPE_VOID, sizeof(void*));
 }
 hffi_value* hffi_new_value_struct(hffi_struct* c){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
     val_ptr->ptr = c;
-    val_ptr->type = hffi_new_type_base(HFFI_TYPE_STRUCT);
+    val_ptr->base_ffi_type = HFFI_TYPE_STRUCT;
+    val_ptr->pointer_base_type = HFFI_TYPE_VOID;
     val_ptr->ref = 1;
     atomic_add(&c->ref, 1);
     return val_ptr;
 }
 hffi_value* hffi_new_value_struct_ptr(hffi_struct* c){
-    hffi_type* t = hffi_new_type(HFFI_TYPE_POINTER, HFFI_TYPE_STRUCT);
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
     val_ptr->ptr = c;
-    val_ptr->type = t;
+    val_ptr->base_ffi_type = HFFI_TYPE_POINTER;
+    val_ptr->pointer_base_type = HFFI_TYPE_STRUCT;
     val_ptr->ref = 1;
     atomic_add(&c->ref, 1);
     return val_ptr;
@@ -252,7 +217,8 @@ hffi_value* hffi_new_value_harray_ptr(harray* c){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
     val_ptr->ptr = c;
-    val_ptr->type = hffi_new_type(HFFI_TYPE_POINTER, HFFI_TYPE_HARRAY);
+    val_ptr->base_ffi_type = HFFI_TYPE_POINTER;
+    val_ptr->pointer_base_type = HFFI_TYPE_HARRAY;
     val_ptr->ref = 1;
     atomic_add(&c->ref, 1);
     return val_ptr;
@@ -262,7 +228,8 @@ hffi_value* hffi_new_value_harray(struct harray* arr){
     val_ptr->sub_types = array_list_new2(4);
     val_ptr->ffi_type = __harray_to_ffi_type(arr, val_ptr->sub_types);
     val_ptr->ptr = arr;
-    val_ptr->type = hffi_new_type_base(HFFI_TYPE_HARRAY);
+    val_ptr->base_ffi_type = HFFI_TYPE_HARRAY;
+    val_ptr->pointer_base_type = HFFI_TYPE_VOID;
     val_ptr->ref = 1;
     atomic_add(&arr->ref, 1);
     return val_ptr;
@@ -271,7 +238,7 @@ void hffi_delete_value(hffi_value* val){
     int old = atomic_add(&val->ref, -1);
     if(old == 1){
         //if is struct.
-        if(val->type->base_ffi_type == HFFI_TYPE_STRUCT){
+        if(val->base_ffi_type == HFFI_TYPE_STRUCT){
             hffi_struct* c = val->ptr;
             hffi_delete_struct(c);
         }else{
@@ -283,7 +250,6 @@ void hffi_delete_value(hffi_value* val){
         if(val->sub_types){
             array_list_delete2(val->sub_types, __release_ffi_type_simple);
         }
-        hffi_delete_type(val->type);
         FREE(val);
     }
 }
@@ -292,31 +258,31 @@ void hffi_value_ref(hffi_value* val, int count){
      atomic_add(&val->ref, count);
 }
 void hffi_value_set_ptr_base_type(hffi_value* val, sint8 base){
-    val->type->pointer_base_type = base;
+    val->pointer_base_type = base;
 }
 ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg){
-    if(val->type->base_ffi_type == HFFI_TYPE_STRUCT){
+    if(val->base_ffi_type == HFFI_TYPE_STRUCT){
         return ((hffi_struct*)(val->ptr))->type;
     }
-    if(val->type->base_ffi_type == HFFI_TYPE_HARRAY){
+    if(val->base_ffi_type == HFFI_TYPE_HARRAY){
         return val->ffi_type;
     }
-    return to_ffi_type(val->type->base_ffi_type, msg);
+    return to_ffi_type(val->base_ffi_type, msg);
 }
 hffi_struct* hffi_value_get_struct(hffi_value* val){
-    if(val->type->base_ffi_type == HFFI_TYPE_STRUCT){
+    if(val->base_ffi_type == HFFI_TYPE_STRUCT){
         return (hffi_struct*)val->ptr;
     }
-    if(val->type->base_ffi_type == HFFI_TYPE_POINTER && val->type->pointer_base_type == HFFI_TYPE_STRUCT){
+    if(val->base_ffi_type == HFFI_TYPE_POINTER && val->pointer_base_type == HFFI_TYPE_STRUCT){
         return (hffi_struct*)val->ptr;
     }
     return NULL;
 }
 harray* hffi_value_get_harray(hffi_value* val){
-    if(val->type->base_ffi_type == HFFI_TYPE_HARRAY){
+    if(val->base_ffi_type == HFFI_TYPE_HARRAY){
         return (harray*)val->ptr;
     }
-    if(val->type->base_ffi_type == HFFI_TYPE_POINTER && val->type->pointer_base_type == HFFI_TYPE_HARRAY){
+    if(val->base_ffi_type == HFFI_TYPE_POINTER && val->pointer_base_type == HFFI_TYPE_HARRAY){
         return (harray*)val->ptr;
     }
     return NULL;
@@ -324,7 +290,7 @@ harray* hffi_value_get_harray(hffi_value* val){
 
 //----------------------------- ------------------------------
 static inline void* __get_data_ptr(hffi_value* v){
-    switch (v->type->base_ffi_type) {
+    switch (v->base_ffi_type) {
     case HFFI_TYPE_STRUCT:
     {
         return ((hffi_struct*)(v->ptr))->data;
@@ -332,9 +298,9 @@ static inline void* __get_data_ptr(hffi_value* v){
 
     case HFFI_TYPE_POINTER:
     {
-        if(v->type->pointer_base_type == HFFI_TYPE_STRUCT){
+        if(v->pointer_base_type == HFFI_TYPE_STRUCT){
             return &((hffi_struct*)(v->ptr))->data;
-        }else if(v->type->pointer_base_type == HFFI_TYPE_HARRAY){
+        }else if(v->pointer_base_type == HFFI_TYPE_HARRAY){
             return &((harray*)(v->ptr))->data;
         }else{
             return &v->ptr;
@@ -793,7 +759,6 @@ hffi_manager* hffi_new_manager(){
 }
 void hffi_delete_manager(hffi_manager* ptr){
     RELEASE_LINK_LIST(ptr->values, hffi_delete_value((hffi_value*)old->data))
-    RELEASE_LINK_LIST(ptr->types, hffi_delete_type((hffi_type*)old->data))
     RELEASE_LINK_LIST(ptr->structs, hffi_delete_struct((hffi_struct*)old->data))
     RELEASE_LINK_LIST(ptr->smtypes, hffi_delete_smtype((hffi_smtype*)old->data))
     RELEASE_LINK_LIST(ptr->hcifs, hffi_delete_cif((hffi_cif*)old->data))
@@ -803,9 +768,6 @@ void hffi_delete_manager(hffi_manager* ptr){
 }
 int hffi_manager_add_value(hffi_manager* hm,hffi_value* v){
     ADD_VAL_TO_MANAGER(values, value_count)
-}
-int hffi_manager_add_type(hffi_manager* hm,hffi_type* v){
-    ADD_VAL_TO_MANAGER(types, type_count)
 }
 int hffi_manager_add_smtype(hffi_manager* hm,hffi_smtype* v){
     ADD_VAL_TO_MANAGER(smtypes, smtype_count)

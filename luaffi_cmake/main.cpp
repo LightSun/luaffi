@@ -6,6 +6,7 @@ extern "C"{
 #include "lualib.h"
 #include "lauxlib.h"
 #include "ffi2.h"
+#include "hffi_lua.h"
 
 void testCall();
 void testCall2();
@@ -26,7 +27,7 @@ if(s){\
 }}
 
 static const luaL_Reg funcs[] = {
-{"ffi", luaopen_ffi},
+//{"ffi", luaopen_ffi},
 {NULL, NULL},
 };
 
@@ -63,6 +64,7 @@ extern "C" int main()
     lua_State * L = luaL_newstate();
     luaL_openlibs(L);
     luaL_openlibs2(L, funcs);
+    register_ffi(L);
 
     if(luaL_dostring(L, "package.path=\"" LUA_DIR "/?.lua;"
                      "\"..package.path"
@@ -73,7 +75,8 @@ extern "C" int main()
         cout << "lua do string success." << endl;
     }
     CALL_LUA(L, [](lua_State * L){
-        return luaL_dofile(L, LUA_DIR "test_libc.lua");
+        //test_libc.lua
+        return luaL_dofile(L, LUA_DIR "test_array.lua");
     });
 
     lua_close(L);
