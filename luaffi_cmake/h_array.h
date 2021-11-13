@@ -14,7 +14,7 @@ typedef struct harray{
     int data_size;
     int ele_count;  //element count
     int VOLATIE ref;
-    struct array_list* ele_list; //only used for harray and struct
+    void** ele_list; //only used for harray* and hffi_struct*
 }harray;
 
 union harray_ele{
@@ -49,12 +49,16 @@ harray* harray_new_arrays(struct array_list* arrays);
  * @return
  */
 harray* harray_new_char(int count);
+
+harray* harray_copy(harray* src);
 void harray_delete(harray* arr);
+
 int harray_get_count(harray* arr);
 void harray_ref(harray* arr, int c);
 
 int harray_geti(harray* arr, int index, union harray_ele* ptr);
 int harray_seti(harray* arr, int index, union harray_ele* ptr);
+
 void harray_dump(harray* arr, struct hstring* hs);
 
 #endif // H_ARRAY_H

@@ -30,6 +30,7 @@ int push_ptr_##T(lua_State* L, T* ptr) {\
 T* get_ptr_##T(lua_State* L, int index) {\
     return *(T**)luaL_checkudata(L, index, __STR(T));\
 }
+
 #define DEF_HFFI_PUSH_GET(t) \
 push_ptr(t)\
 get_ptr(t)
@@ -182,6 +183,7 @@ static int xffi_harray_newindex(lua_State* L){
     //tab, i, val(single or table)
     harray* arr = get_ptr_harray(L, -3);
     int index = luaL_checkinteger(L, -2);
+    if(index < 0) index = arr->ele_count + index;
     if(lua_type(L, -1) == LUA_TTABLE){
         int c = lua_rawlen(L, -1);
         if(c > arr->ele_count - index){
@@ -213,21 +215,35 @@ static int __harray_func_set(lua_State* L){
     xffi_harray_newindex(L);
     return 0;
 }
+static int __harray_func_copy(lua_State* L){
+    //copy
+    harray* arr = get_ptr_harray(L, lua_upvalueindex(1));
+    return push_ptr_harray(L, harray_copy(arr));
+}
+static const luaL_Reg g_harray_str_Methods[] = {
+    {"set", __harray_func_set},
+    {"copy", __harray_func_copy},
+    {NULL, NULL}
+};
 static int xffi_harray_index(lua_State* L){
     //may be eg: arr.set(1, {5, 6})
     if(lua_type(L, 2) == LUA_TSTRING){
         const char* fun_name = lua_tostring(L, 2);
-        if(strcmp(fun_name, "set") == 0){
-            //array, str
-            lua_pushvalue(L, 1);
-            lua_pushcclosure(L, __harray_func_set, 1);
-            return 1; //return a function
+        //array, str
+        const luaL_Reg *lib;
+        for (lib = g_harray_str_Methods; lib->name; lib++) {
+            if(strcmp(lib->name, fun_name) == 0){
+                lua_pushvalue(L, 1);
+                lua_pushcclosure(L, lib->func, 1);
+                return 1;
+            }
         }
         return luaL_error(L, "unsupport method('%s') for harray.", fun_name);
     }
     //tab, i
     harray* arr = get_ptr_harray(L, 1);
     int index = luaL_checkinteger(L, 2);
+    if(index < 0) index = arr->ele_count + index;
     switch (arr->hffi_t) {
      _harray_index_impl_int(HFFI_TYPE_SINT8, sint8)
      _harray_index_impl_int(HFFI_TYPE_UINT8, uint8)

@@ -17,11 +17,11 @@ struct array_list;
 struct harray;
 
 typedef struct hffi_value{
-    int8_t base_ffi_type;        //see ffi.h
-    int8_t pointer_base_type;    //the raw base type. eg: int** -> int
-    int volatile ref;        //ref count
-    void* ptr;               //may be data-ptr/struct-ptr/harray-ptr
-    ffi_type* ffi_type;      //cache ffi_type
+    int8_t base_ffi_type;        // see ffi.h
+    int8_t pointer_base_type;    // the raw base type. eg: int** -> int
+    int volatile ref;        // ref count
+    void* ptr;               // may be data-ptr/struct-ptr/harray-ptr
+    ffi_type* ffi_type;      // cache ffi_type
     struct array_list* sub_types;
 }hffi_value;
 
@@ -31,16 +31,16 @@ typedef struct hffi_smtype{
     sint8 ffi_type;
     void* _struct;                  //sometimes we may want put struct (hffi_struct*) directly.
     void* _harray;                  //sometimes we may want put harray(harray*) directly.
-    struct hffi_smtype** elements;  //child types
+    struct array_list*  elements;   //children types. element is hffi_smtype
 }hffi_smtype;
 
 typedef struct hffi_struct{
     void* data;         // the data of struct, may be shared by parent struct.
     ffi_type * type;    // struct base info. all types with offsets.
     sint16 parent_pos;  // the parent position if need. or -1 for no parent struct.
-    int type_size;      // the 'type' size.
+    sint8* hffi_types;  // the member base types, latter used to get value.
     int data_size;
-    int count;          //member count
+    int count;          // member count
     int volatile ref;
     struct array_list* sub_ffi_types;
     struct array_list* children; // used to save struct_item
@@ -66,7 +66,9 @@ typedef struct hffi_manager{
     struct linklist_node* values;
     struct linklist_node* structs;
     struct linklist_node* smtypes;
+    struct linklist_node* harrays;
     struct linklist_node* hcifs;
+    int harray_count;
     int value_count;
     int struct_count;
     int smtype_count;
@@ -74,6 +76,7 @@ typedef struct hffi_manager{
     struct linklist_node* list; //help list for memorys
 }hffi_manager;
 
+extern void list_travel_smtype_delete(void* d);
 
 //error_msg can be null
 ffi_type* to_ffi_type(int8_t ffi_t, char** error_msg);
@@ -125,6 +128,8 @@ hffi_value* hffi_new_value_struct_ptr(hffi_struct* c);
 hffi_value* hffi_new_value_harray(struct harray* arr);
 hffi_value* hffi_new_value_harray_ptr(struct harray* arr);
 
+hffi_value* hffi_value_copy(hffi_value* val);
+
 void hffi_delete_value(hffi_value* val);
 void hffi_value_ref(hffi_value* val, int count);
 void hffi_value_set_ptr_base_type(hffi_value* val, sint8 base);
@@ -155,12 +160,17 @@ int hffi_call_abi(int abi, void (*fn)(void), hffi_value** in, hffi_value* out, c
 
 //-------------------- sm type -------------------------------
 #define hffi_new_smtype_base(t) hffi_new_smtype(t, NULL)
-hffi_smtype* hffi_new_smtype(sint8 ffi_type, hffi_smtype** member_types);
+
+/** create smtype. and if 'member_types' not null, the list will be managed by smtype. */
+hffi_smtype* hffi_new_smtype(sint8 ffi_type, struct array_list* member_types);
+
 hffi_smtype* hffi_new_smtype_struct(hffi_struct* _struct);
 hffi_smtype* hffi_new_smtype_struct_ptr(hffi_struct* _struct);
 hffi_smtype* hffi_new_smtype_harray(struct harray* array);
 hffi_smtype* hffi_new_smtype_harray_ptr(struct harray* array);
 void hffi_delete_smtype(hffi_smtype* type);
+
+hffi_smtype* hffi_smtype_cpoy(hffi_smtype* src);
 
 //---------------- struct -----------------
 /**
@@ -193,7 +203,6 @@ hffi_struct* hffi_new_struct_from_list(struct array_list* member_types, char** m
 hffi_struct* hffi_new_struct_base(sint8* types, int count);
 
 void hffi_delete_structs(hffi_struct** cs, int count);
-hffi_struct* hffi_struct_copy(hffi_struct* _hs);
 
 //----------------- manager -------------------
 
@@ -203,6 +212,7 @@ int hffi_manager_add_value(hffi_manager*, hffi_value* v);
 int hffi_manager_add_smtype(hffi_manager*, hffi_smtype* v);
 int hffi_manager_add_struct(hffi_manager*, hffi_struct* v);
 int hffi_manager_add_cif(hffi_manager* hm,hffi_cif* v);
+int hffi_manager_add_harray(hffi_manager* hm,struct harray* v);
 /**
  * @brief hffi_manager_alloc: allocate a memory for temp use. the memory will be released by call 'hffi_delete_manager()'
  * @param size the memory size

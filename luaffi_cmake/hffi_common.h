@@ -66,6 +66,9 @@ typedef unsigned long long uint64;
 #define HFFI_TYPE_HARRAY_PTR (FFI_TYPE_LAST + 3)
 #define HFFI_TYPE_STRUCT_PTR (FFI_TYPE_LAST + 4)
 
+#define H_UNSED(x) (void)x;
+#define H_UNSED2(x,y) H_UNSED(x) H_UNSED(y)
+
 struct hffi_struct;
 
 void hffi_delete_struct(struct hffi_struct* c);
@@ -79,5 +82,7 @@ int hffi_struct_get_data_size(struct hffi_struct* c);
  * @param ref_count: the reference count
  */
 void hffi_struct_ref(struct hffi_struct* c, int ref_count);
+
+struct hffi_struct* hffi_struct_copy(struct hffi_struct* src);
 
 #endif // HFFI_COMMON_H
