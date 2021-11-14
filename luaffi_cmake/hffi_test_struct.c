@@ -24,8 +24,8 @@ void hffi_test_struct(){
 
     hffi_manager* m = hffi_new_manager();
 
-    hffi_smtype* t_float = hffi_new_smtype(HFFI_TYPE_FLOAT, NULL);
-    hffi_smtype* t_ul = hffi_new_smtype(HFFI_TYPE_UINT64, NULL);
+    hffi_smtype* t_float = hffi_new_smtype(HFFI_TYPE_FLOAT);
+    hffi_smtype* t_ul = hffi_new_smtype(HFFI_TYPE_UINT64);
     hffi_manager_add_smtype(m, t_float);
     hffi_manager_add_smtype(m, t_ul);
 
@@ -82,8 +82,8 @@ void hffi_test_struct2(){
 
     hffi_manager* m = hffi_new_manager();
 
-    hffi_smtype* t_float = hffi_new_smtype(HFFI_TYPE_FLOAT, NULL);
-    hffi_smtype* t_ul = hffi_new_smtype(HFFI_TYPE_UINT64, NULL);
+    hffi_smtype* t_float = hffi_new_smtype(HFFI_TYPE_FLOAT);
+    hffi_smtype* t_ul = hffi_new_smtype(HFFI_TYPE_UINT64);
     hffi_manager_add_smtype(m, t_float);
     hffi_manager_add_smtype(m, t_ul);
 
@@ -145,8 +145,8 @@ void hffi_test_struct3(){
 
     hffi_manager* m = hffi_new_manager();
 
-    hffi_smtype* t_float = hffi_new_smtype(HFFI_TYPE_FLOAT, NULL);
-    hffi_smtype* t_ul = hffi_new_smtype(HFFI_TYPE_UINT64, NULL);
+    hffi_smtype* t_float = hffi_new_smtype(HFFI_TYPE_FLOAT);
+    hffi_smtype* t_ul = hffi_new_smtype(HFFI_TYPE_UINT64);
     hffi_manager_add_smtype(m, t_float);
     hffi_manager_add_smtype(m, t_ul);
 

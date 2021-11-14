@@ -110,6 +110,8 @@ hffi_value_get_auto_x_def(float)
 hffi_value_get_auto_x_def(double)
 
 hffi_value* hffi_new_value_raw_type(sint8 type);
+hffi_value* hffi_new_value_raw_type2(sint8 type, void* val_ptr);
+hffi_value* hffi_new_value_ptr2(sint8 type, void* val_ptr);
 
 /**
  * @brief hffi_new_value_struct: pack the struct as value
@@ -132,9 +134,12 @@ hffi_value* hffi_value_copy(hffi_value* val);
 
 void hffi_delete_value(hffi_value* val);
 void hffi_value_ref(hffi_value* val, int count);
-void hffi_value_set_ptr_base_type(hffi_value* val, sint8 base);
 
 ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg);
+
+/** get value as base value. */
+int hffi_value_get_base(hffi_value* val, void* out_ptr);
+//TODO permit cast ptr(like int**) to direct array?
 
 hffi_struct* hffi_value_get_struct(hffi_value* c);
 struct harray* hffi_value_get_harray(hffi_value* val);
@@ -159,10 +164,10 @@ int hffi_call(void (*fn)(void), hffi_value** in, hffi_value* out, char** msg);
 int hffi_call_abi(int abi, void (*fn)(void), hffi_value** in, hffi_value* out, char** msg);
 
 //-------------------- sm type -------------------------------
-#define hffi_new_smtype_base(t) hffi_new_smtype(t, NULL)
 
-/** create smtype. and if 'member_types' not null, the list will be managed by smtype. */
-hffi_smtype* hffi_new_smtype(sint8 ffi_type, struct array_list* member_types);
+hffi_smtype* hffi_new_smtype(sint8 ffi_type);
+//members as struct members
+hffi_smtype* hffi_new_smtype_members(struct array_list* member_types);
 
 hffi_smtype* hffi_new_smtype_struct(hffi_struct* _struct);
 hffi_smtype* hffi_new_smtype_struct_ptr(hffi_struct* _struct);

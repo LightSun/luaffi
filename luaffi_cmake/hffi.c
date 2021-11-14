@@ -9,7 +9,7 @@
 
 #define hffi_new_value_auto_x(ffi_t,type) \
 hffi_value* hffi_new_value_##type(type val){\
-    hffi_value* v = hffi_new_value(ffi_t, HFFI_TYPE_VOID,sizeof(type));\
+    hffi_value* v = hffi_new_value(ffi_t, HFFI_TYPE_VOID,sizeof(type*));\
     type* p = (type*)v->ptr;\
     *p = val;\
     return v;\
@@ -31,6 +31,20 @@ int hffi_value_get_##t(hffi_value* val, t* out_ptr){\
     }\
     return 1;\
 }
+
+#define DEF_NEW_VALUE_RAW(ffi_t, type)\
+case ffi_t:{\
+    hffi_value* hv = hffi_new_value(ffi_t, HFFI_TYPE_VOID, sizeof (type*));\
+    *((type*)hv->ptr) = *((type*)val_ptr);\
+    return hv;\
+}break;
+
+#define DEF_NEW_VALUE_PTR2(ffi_t, type)\
+case ffi_t:{\
+    hffi_value* hv = hffi_new_value(HFFI_TYPE_POINTER, ffi_t, sizeof (type*));\
+    *((type*)hv->ptr) = *((type*)val_ptr);\
+    return hv;\
+}break;
 
 typedef struct struct_item{
     int index;      //the index of struct
@@ -208,26 +222,61 @@ hffi_value_get_auto_x(int)
 hffi_value_get_auto_x(float)
 hffi_value_get_auto_x(double)
 
-hffi_value* hffi_new_value_raw_type(sint8 ffi_t){
-    int size = 0;
+hffi_value* hffi_new_value_raw_type2(sint8 ffi_t, void* val_ptr){
     switch (ffi_t) {
-    case HFFI_TYPE_SINT8:{size = sizeof (sint8);}break;
-    case HFFI_TYPE_UINT8:{size = sizeof (uint8);}break;
-    case HFFI_TYPE_SINT16:{size = sizeof (sint16);}break;
-    case HFFI_TYPE_UINT16:{size = sizeof (uint16);}break;
-    case HFFI_TYPE_SINT32:{size = sizeof (sint32);}break;
-    case HFFI_TYPE_UINT32:{size = sizeof (uint32);}break;
-    case HFFI_TYPE_SINT64:{size = sizeof (sint64);}break;
-    case HFFI_TYPE_UINT64:{size = sizeof (uint64);}break;
-    case HFFI_TYPE_FLOAT:{size = sizeof (float);}break;
-    case HFFI_TYPE_DOUBLE:{size = sizeof (double);}break;
-
-    case HFFI_TYPE_INT:{size = sizeof (sint32);}break;
+    DEF_NEW_VALUE_RAW(HFFI_TYPE_SINT8, sint8)
+    DEF_NEW_VALUE_RAW(HFFI_TYPE_UINT8, uint8)
+    DEF_NEW_VALUE_RAW(HFFI_TYPE_SINT16, sint16)
+    DEF_NEW_VALUE_RAW(HFFI_TYPE_UINT16, uint16)
+    DEF_NEW_VALUE_RAW(HFFI_TYPE_SINT32, sint32)
+    DEF_NEW_VALUE_RAW(HFFI_TYPE_UINT32, uint32)
+    DEF_NEW_VALUE_RAW(HFFI_TYPE_SINT64, sint64)
+    DEF_NEW_VALUE_RAW(HFFI_TYPE_UINT64, uint64)
+    DEF_NEW_VALUE_RAW(HFFI_TYPE_FLOAT, float)
+    DEF_NEW_VALUE_RAW(HFFI_TYPE_DOUBLE, double)
+    DEF_NEW_VALUE_RAW(HFFI_TYPE_INT, int)
     default:
         return NULL;
     }
-    return hffi_new_value(ffi_t, HFFI_TYPE_VOID, size);
-    //return hffi_new_value(ffi_t, HFFI_TYPE_VOID, sizeof(void*));
+}
+hffi_value* hffi_new_value_ptr2(sint8 ffi_t, void* val_ptr){
+    switch (ffi_t) {
+    DEF_NEW_VALUE_PTR2(HFFI_TYPE_SINT8, sint8)
+    DEF_NEW_VALUE_PTR2(HFFI_TYPE_UINT8, uint8)
+    DEF_NEW_VALUE_PTR2(HFFI_TYPE_SINT16, sint16)
+    DEF_NEW_VALUE_PTR2(HFFI_TYPE_UINT16, uint16)
+    DEF_NEW_VALUE_PTR2(HFFI_TYPE_SINT32, sint32)
+    DEF_NEW_VALUE_PTR2(HFFI_TYPE_UINT32, uint32)
+    DEF_NEW_VALUE_PTR2(HFFI_TYPE_SINT64, sint64)
+    DEF_NEW_VALUE_PTR2(HFFI_TYPE_UINT64, uint64)
+    DEF_NEW_VALUE_PTR2(HFFI_TYPE_FLOAT, float)
+    DEF_NEW_VALUE_PTR2(HFFI_TYPE_DOUBLE, double)
+    DEF_NEW_VALUE_PTR2(HFFI_TYPE_INT, int)
+    default:
+        return NULL;
+    }
+}
+
+hffi_value* hffi_new_value_raw_type(sint8 ffi_t){
+//    int size = 0;
+//    switch (ffi_t) {
+//    case HFFI_TYPE_SINT8:{size = sizeof (sint8);}break;
+//    case HFFI_TYPE_UINT8:{size = sizeof (uint8);}break;
+//    case HFFI_TYPE_SINT16:{size = sizeof (sint16);}break;
+//    case HFFI_TYPE_UINT16:{size = sizeof (uint16);}break;
+//    case HFFI_TYPE_SINT32:{size = sizeof (sint32);}break;
+//    case HFFI_TYPE_UINT32:{size = sizeof (uint32);}break;
+//    case HFFI_TYPE_SINT64:{size = sizeof (sint64);}break;
+//    case HFFI_TYPE_UINT64:{size = sizeof (uint64);}break;
+//    case HFFI_TYPE_FLOAT:{size = sizeof (float);}break;
+//    case HFFI_TYPE_DOUBLE:{size = sizeof (double);}break;
+
+//    case HFFI_TYPE_INT:{size = sizeof (sint32);}break;
+//    default:
+//        return NULL;
+//    }
+   // return hffi_new_value(ffi_t, HFFI_TYPE_VOID, size);
+    return hffi_new_value(ffi_t, HFFI_TYPE_VOID, sizeof(void*));
 }
 hffi_value* hffi_new_value_struct(hffi_struct* c){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
@@ -340,8 +389,36 @@ void hffi_delete_value(hffi_value* val){
 void hffi_value_ref(hffi_value* val, int count){
      atomic_add(&val->ref, count);
 }
-void hffi_value_set_ptr_base_type(hffi_value* val, sint8 base){
-    val->pointer_base_type = base;
+
+#define DEF_VALUE_GET_BASE_IMPL(ffi_t, type)\
+case ffi_t:{\
+    *((type*)out_ptr) = *((type*)val->ptr);\
+    return HFFI_STATE_OK;\
+}break;
+
+int hffi_value_get_base(hffi_value* val, void* out_ptr){
+    switch (val->base_ffi_type) {
+    case HFFI_TYPE_STRUCT:
+    case HFFI_TYPE_HARRAY:
+    case HFFI_TYPE_POINTER:{
+       return HFFI_STATE_FAILED;
+    }break;
+
+    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_SINT8, sint8)
+    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_UINT8, uint8)
+    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_SINT16, sint16)
+    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_UINT16, uint16)
+    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_SINT32, sint32)
+    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_UINT32, uint32)
+    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_SINT64, sint64)
+    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_UINT64, uint64)
+    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_FLOAT, float)
+    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_DOUBLE, double)
+    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_INT, int)
+
+    default:{}break;
+    }
+    return HFFI_STATE_FAILED;
 }
 ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg){
     if(val->base_ffi_type == HFFI_TYPE_STRUCT){
@@ -458,7 +535,7 @@ static void __smtypes_travel_ref(void* ud, int size, int index,void* ele){
     hffi_smtype* t = ele;
     atomic_add(&t->ref, 1);
 }
-hffi_smtype* hffi_new_smtype(sint8 ffi_type, array_list* member_types){
+static inline hffi_smtype* __hffi_new_smtype0(sint8 ffi_type, array_list* member_types){
     hffi_smtype* ptr = MALLOC(sizeof (hffi_smtype));
     ptr->ffi_type = ffi_type;
     ptr->ref = 1;
@@ -469,6 +546,12 @@ hffi_smtype* hffi_new_smtype(sint8 ffi_type, array_list* member_types){
         array_list_travel(member_types, __smtypes_travel_ref, NULL);
     }
     return ptr;
+}
+hffi_smtype* hffi_new_smtype(sint8 ffi_type){
+    return __hffi_new_smtype0(ffi_type, NULL);
+}
+hffi_smtype* hffi_new_smtype_members(struct array_list* member_types){
+    return __hffi_new_smtype0(HFFI_TYPE_STRUCT, member_types);
 }
 hffi_smtype* hffi_new_smtype_struct(hffi_struct* _struct){
     hffi_smtype* ptr = MALLOC(sizeof (hffi_smtype));
@@ -604,7 +687,7 @@ static hffi_struct* hffi_new_struct_abi0(int abi,hffi_smtype** member_types, sin
 hffi_struct* hffi_new_struct_base(sint8* types, int count){
     hffi_smtype* smtypes[count +1];
     for(int i = 0 ; i < count; i ++){
-        smtypes[i] = hffi_new_smtype(types[i], NULL);
+        smtypes[i] = hffi_new_smtype(types[i]);
     }
     smtypes[count] = NULL;
     hffi_struct* c = hffi_new_struct(smtypes, NULL);

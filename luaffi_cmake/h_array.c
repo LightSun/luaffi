@@ -90,9 +90,16 @@ harray* harray_new(sint8 hffi_t, int count){
     arr->data_size = ele_size * count;
     arr->ele_count = count;
     arr->ref = 1;
-    if(hffi_t == HFFI_TYPE_STRUCT_PTR || hffi_t == HFFI_TYPE_HARRAY_PTR){
+    switch (hffi_t) {
+    case HFFI_TYPE_STRUCT_PTR:
+    case HFFI_TYPE_STRUCT:
+    case HFFI_TYPE_HARRAY_PTR:
+    case HFFI_TYPE_HARRAY:{
         arr->ele_list = MALLOC(sizeof (void*) * count);
         memset(arr->ele_list, 0 , sizeof (sizeof (void*) * count));
+    }break;
+    default:
+        arr->ele_list = NULL;
     }
     return arr;
 }
@@ -100,6 +107,20 @@ harray* harray_new(sint8 hffi_t, int count){
 harray* harray_new_char(int count){
     harray* arr = harray_new(HFFI_TYPE_SINT8, count);
     ((char*)arr->data)[count - 1] = '\0';
+    return arr;
+}
+harray* harray_new_chars(const char* str){
+    int c = strlen(str) + 1;
+    harray* arr = harray_new(HFFI_TYPE_SINT8, c);
+    ((char*)arr->data)[c - 1] = '\0';
+    strcpy((char*)arr->data, str);
+    return arr;
+}
+harray* harray_new_chars2(const char* str, int len){
+    int c = strlen(str) + 1;
+    harray* arr = harray_new(HFFI_TYPE_SINT8, len);
+    ((char*)arr->data)[c - 1] = '\0';
+    memcpy(arr->data, str, strlen(str));
     return arr;
 }
 harray* harray_copy(harray* src){
@@ -245,6 +266,11 @@ case hffi_t:{\
     ((t*)arr->data)[index] = ptr->_##t;\
 }return HFFI_STATE_OK;
 
+#define __SET_I_2(hffi_t, t)\
+case hffi_t:{\
+    ((t*)arr->data)[index] = *((t*)ptr);\
+}return HFFI_STATE_OK;
+
 int harray_seti(harray* arr, int index, union harray_ele* ptr){
     //for harray or struct we need make data-connected
     if(index >= arr->ele_count){
@@ -301,7 +327,12 @@ int harray_seti(harray* arr, int index, union harray_ele* ptr){
         if(ptr->_extra == NULL){
             return HFFI_STATE_FAILED;
         }
-        //must provide an array to copy daya.
+        //if current no entity, we hold it for latter use.
+        if(arr->ele_list[index] == NULL){
+            arr->ele_list[index] = ptr->_extra;
+            harray_ref((harray*)ptr->_extra, 1);
+        }
+        //copy data
         int target_size = ((harray*)ptr->_extra)->data_size;
         if(target_size != arr->data_size / arr->ele_count){
             return HFFI_STATE_FAILED;
@@ -314,6 +345,12 @@ int harray_seti(harray* arr, int index, union harray_ele* ptr){
         if(ptr->_extra == NULL){
             return HFFI_STATE_FAILED;
         }
+        //if current no entity, we hold it for latter use.
+        if(arr->ele_list[index] == NULL){
+            arr->ele_list[index] = ptr->_extra;
+            hffi_struct_ref((struct hffi_struct*)ptr->_extra, 1);
+        }
+        //copy data
         int target_size = hffi_struct_get_data_size((struct hffi_struct*)ptr->_extra);
         if(target_size != arr->data_size / arr->ele_count){
             return HFFI_STATE_FAILED;
@@ -325,6 +362,98 @@ int harray_seti(harray* arr, int index, union harray_ele* ptr){
     }
     return HFFI_STATE_FAILED;
 }
+
+int harray_seti2(harray* arr, int index, void* ptr){
+    if(index >= arr->ele_count){
+        return HFFI_STATE_FAILED;
+    }
+    switch (arr->hffi_t) {
+    __SET_I_2(HFFI_TYPE_SINT8, sint8)
+    __SET_I_2(HFFI_TYPE_UINT8, uint8)
+    __SET_I_2(HFFI_TYPE_SINT16, sint16)
+    __SET_I_2(HFFI_TYPE_UINT16, uint16)
+    __SET_I_2(HFFI_TYPE_SINT32, sint32)
+    __SET_I_2(HFFI_TYPE_UINT32, uint32)
+    __SET_I_2(HFFI_TYPE_SINT64, sint64)
+    __SET_I_2(HFFI_TYPE_UINT64, uint64)
+
+    __SET_I_2(HFFI_TYPE_FLOAT, float)
+    __SET_I_2(HFFI_TYPE_DOUBLE, double)
+    __SET_I_2(HFFI_TYPE_INT, int)
+
+    case HFFI_TYPE_HARRAY_PTR:{
+        if(arr->ele_list[index] != NULL){
+            harray_delete(((harray*)arr->ele_list[index]));
+        }
+        if(ptr == NULL){
+            void** data = arr->data;
+            data[index] = NULL;
+            arr->ele_list[index] = NULL;
+        }else{
+            harray_ref((harray*)ptr, 1);
+            void** data = arr->data;
+            data[index] = ((harray*)ptr)->data;
+            arr->ele_list[index] = ptr;
+        }
+        return HFFI_STATE_OK;
+    }break;
+    case HFFI_TYPE_STRUCT_PTR:{
+        if(arr->ele_list[index] != NULL){
+            hffi_delete_struct((struct hffi_struct*)arr->ele_list[index]);
+        }
+        if(ptr == NULL){
+            void** data = arr->data;
+            data[index] = NULL;
+            arr->ele_list[index] = NULL;
+        }else{
+            hffi_struct_ref((struct hffi_struct*)ptr, 1);
+            void** data = arr->data;
+            data[index] = hffi_struct_get_data((struct hffi_struct*)ptr);
+            arr->ele_list[index] = ptr;
+        }
+        return HFFI_STATE_OK;
+    }break;
+
+    case HFFI_TYPE_HARRAY:{
+        if(ptr == NULL){
+            return HFFI_STATE_FAILED;
+        }
+        //if current no entity, we hold it for latter use.
+        if(arr->ele_list[index] == NULL){
+            arr->ele_list[index] = ptr;
+            harray_ref((harray*)ptr, 1);
+        }
+        //must provide an array to copy daya.
+        int target_size = ((harray*)ptr)->data_size;
+        if(target_size != arr->data_size / arr->ele_count){
+            return HFFI_STATE_FAILED;
+        }
+        void* data_ptr = arr->data + index * (arr->data_size / arr->ele_count);
+        memcpy(data_ptr, ((harray*)ptr)->data, target_size);
+        return HFFI_STATE_OK;
+    }break;
+    case HFFI_TYPE_STRUCT:{
+        if(ptr == NULL){
+            return HFFI_STATE_FAILED;
+        }
+        //if current no entity, we hold it for latter use.
+        if(arr->ele_list[index] == NULL){
+            arr->ele_list[index] = ptr;
+            hffi_struct_ref((struct hffi_struct*)ptr, 1);
+        }
+        //copy-data
+        int target_size = hffi_struct_get_data_size((struct hffi_struct*)ptr);
+        if(target_size != arr->data_size / arr->ele_count){
+            return HFFI_STATE_FAILED;
+        }
+        void* data_ptr = arr->data + index * (arr->data_size / arr->ele_count);
+        memcpy(data_ptr, hffi_struct_get_data((struct hffi_struct*)ptr), target_size);
+        return HFFI_STATE_OK;
+    }break;
+    }
+    return HFFI_STATE_FAILED;
+}
+
 
 #define harray_dump_impl(hffi_t, type, format)\
 case hffi_t:{\

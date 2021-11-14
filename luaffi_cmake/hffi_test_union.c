@@ -56,7 +56,7 @@ void test_call_union1(int hffi_t,void* fn, void (*Func_post)(hffi_value*)){
 
     hffi_manager* m = hffi_new_manager();
 
-    hffi_smtype* t_double = hffi_new_smtype_base(hffi_t);
+    hffi_smtype* t_double = hffi_new_smtype(hffi_t);
     hffi_manager_add_smtype(m, t_double);
 
     hffi_smtype* arr[2];
