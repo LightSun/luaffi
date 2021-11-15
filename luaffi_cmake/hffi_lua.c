@@ -7,6 +7,10 @@
 #include "h_array.h"
 #include "h_string.h"
 
+extern int hlua_get_int(lua_State* L, int idx, const char* key, int def_val);
+extern int hlua_get_boolean(lua_State* L, int idx, const char* key, int def_val);
+extern int hlua_rawgeti_int(lua_State* L, int tab_idx, int n);
+
 #define _UNKNOWN_ "_unknown_"
 #define __STR(s) #s
 
@@ -87,12 +91,6 @@ static void string_delete(void* d){
 static void value_delete(void* d){
     hffi_delete_value((hffi_value*)d);
 }
-//static void __harray_delete(void* d){
-//    harray_delete((harray*)d);
-//}
-//static void __struct_delete(void* d){
-//    hffi_delete_struct((hffi_struct*)d);
-//}
 //------------------- harray --------------------
 
 #define _harray_index_impl_int(hffi_t, type)\
@@ -581,6 +579,27 @@ static int xffi_value_gc(lua_State *L){
 }
 static int xffi_value_get(lua_State *L){
     hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
+    if(val->base_ffi_type == HFFI_TYPE_VOID){
+        return 0;
+    }
+    //multi level ptr
+    if(val->multi_level_ptr){
+        //int rows, int cols, int continue_mem, int share_mem
+        luaL_checktype(L, 1, LUA_TTABLE);
+        int continue_mem = 1;
+        int share_mem = 1;
+        continue_mem = hlua_get_boolean(L, 1, "continue_mem", continue_mem);
+        share_mem = hlua_get_boolean(L, 1, "share_mem", share_mem);
+
+        if(lua_rawlen(L, 1) == 0) return 0;
+        int rows = hlua_rawgeti_int(L, 1, 1);
+        int cols = 0;
+        if(lua_rawlen(L, 1) >= 2){
+            cols = hlua_rawgeti_int(L, 1, 2);
+        }
+        harray* arr = hffi_value_get_pointer_as_array(val, rows, cols, continue_mem, share_mem);
+        return push_ptr_harray(L, arr);
+    }
     //int rows, int cols, int continue_mem, int share_mem
     hffi_struct* hs = hffi_value_get_struct(val);
     if(hs != NULL){
@@ -592,13 +611,22 @@ static int xffi_value_get(lua_State *L){
         harray_ref(hy, 1);
         return push_ptr_harray(L, hy);
     }
-    //TODO
-    return 0;
-}
-static int xffi_value_get_as_array(lua_State *L){
-    hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
-    //int rows, int cols, int continue_mem, int share_mem
-
+    //the value may create from ptr-ptr. you should ensure.
+    int ffi_t = val->base_ffi_type;
+    if(ffi_t == HFFI_TYPE_POINTER){
+        ffi_t = val->pointer_base_type;
+    }
+    if(ffi_t == HFFI_TYPE_FLOAT || ffi_t == HFFI_TYPE_DOUBLE){
+        lua_Number num;
+        hffi_value_get_base(val, &num);
+        lua_pushnumber(L, num);
+        return 1;
+    }else{
+        lua_Integer num;
+        hffi_value_get_base(val, &num);
+        lua_pushinteger(L, num);
+        return 1;
+    }
     return 0;
 }
 static int xffi_value_copy(lua_State *L){
@@ -618,17 +646,13 @@ static int xffi_value_index(lua_State *L){
             lua_pushcclosure(L, xffi_value_get, 1);
             return 1;
         }
-        if(strcmp(fun_name, "xffi_value_get_as_array") == 0){
-            lua_pushvalue(L, 1);
-            lua_pushcclosure(L, xffi_value_get, 1);
-            return 1;
-        }
     }
     return 0;
 }
 
 static const luaL_Reg g_hffi_value_Methods[] = {
     {"__gc", xffi_value_gc},
+    {"__index", xffi_value_index},
     {NULL, NULL}
 };
 //------------------- dym_func ------------
@@ -882,29 +906,9 @@ static harray* __harray_new_from_table(lua_State* L, int idx){
     int asPtr = 0;
     sint8 base_type = HFFI_TYPE_INT;
     if(lua_type(L, idx + 1) == LUA_TTABLE){
-        int t = lua_getfield(L, idx +1, "len");
-        if(t == LUA_TNUMBER){
-            len = luaL_checkinteger(L, -1);
-            lua_pushnil(L);
-            lua_setfield(L, idx +1, "len");
-        }
-        lua_pop(L, 1);
-        //type
-        t = lua_getfield(L, idx +1, "type");
-        if(t == LUA_TNUMBER){
-            base_type = (sint8)luaL_checkinteger(L, -1);
-            lua_pushnil(L);
-            lua_setfield(L, idx +1, "type");
-        }
-        lua_pop(L, 1);
-        //asPtr
-        t = lua_getfield(L, idx +1, "asPtr");
-        if(t == LUA_TBOOLEAN){
-            asPtr = lua_toboolean(L, -1);
-            lua_pushnil(L);
-            lua_setfield(L, idx +1, "asPtr");
-        }
-        lua_pop(L, 1);
+        len = hlua_get_int(L, idx + 1, "len", len);
+        base_type = (sint8)hlua_get_int(L, idx + 1, "type", base_type);
+        asPtr = hlua_get_boolean(L, idx + 1, "asPtr", asPtr);
     }
 
     int count = lua_rawlen(L, idx);

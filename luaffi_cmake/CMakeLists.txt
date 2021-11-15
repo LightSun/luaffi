@@ -33,6 +33,7 @@ add_executable(luaffi_app
 
     hffi_lua.h
     hffi_lua.c
+    lua_utils.c
 
     h_array_test.c
     hffi_test.c

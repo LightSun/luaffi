@@ -194,6 +194,7 @@ hffi_value* hffi_new_value_ptr_no_data(sint8 hffi_t2){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
     val_ptr->ptr = NULL;
+    val_ptr->multi_level_ptr = 1;
     val_ptr->base_ffi_type = HFFI_TYPE_POINTER;
     val_ptr->pointer_base_type = hffi_t2;
     val_ptr->ref = 1;
@@ -327,6 +328,7 @@ hffi_value* hffi_value_copy(hffi_value* val){
     val_ptr->base_ffi_type = val->base_ffi_type;
     val_ptr->pointer_base_type = val->pointer_base_type;
     val_ptr->ref = 1;
+    val_ptr->multi_level_ptr = val->multi_level_ptr;
 
     switch (val->base_ffi_type) {
     case HFFI_TYPE_HARRAY:{
@@ -399,7 +401,11 @@ case ffi_t:{\
 }break;
 
 int hffi_value_get_base(hffi_value* val, void* out_ptr){
-    switch (val->base_ffi_type) {
+    int ffi_t = val->base_ffi_type;
+    if(ffi_t == HFFI_TYPE_POINTER){
+        ffi_t = val->pointer_base_type;
+    }
+    switch (ffi_t) {
     case HFFI_TYPE_STRUCT:
     case HFFI_TYPE_HARRAY:
     case HFFI_TYPE_POINTER:{

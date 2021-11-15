@@ -17,12 +17,13 @@ struct array_list;
 struct harray;
 
 typedef struct hffi_value{
-    int8_t base_ffi_type;        // see ffi.h
-    int8_t pointer_base_type;    // the raw base type. eg: int** -> int
-    int volatile ref;        // ref count
-    void* ptr;               // may be data-ptr/struct-ptr/harray-ptr
-    ffi_type* ffi_type;      // cache ffi_type
-    struct array_list* sub_types;
+    sint8 base_ffi_type;            // see ffi.h
+    sint8 pointer_base_type;        // the raw base type. eg: int** -> int
+    sint8 multi_level_ptr;          // true if is multi-level-ptr. that means the data is malloc by function.
+    int volatile ref;               // ref count
+    void* ptr;                      // may be data-ptr/struct-ptr/harray-ptr
+    ffi_type* ffi_type;             // cache ffi_type
+    struct array_list* sub_types;   // mallocated sub types.
 }hffi_value;
 
 //struct member type
@@ -139,7 +140,7 @@ void hffi_value_ref(hffi_value* val, int count);
 
 ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg);
 
-/** get value as base value. */
+/** get value as base value. like int/char/in* /char* /... etc. */
 int hffi_value_get_base(hffi_value* val, void* out_ptr);
 
 hffi_struct* hffi_value_get_struct(hffi_value* c);
