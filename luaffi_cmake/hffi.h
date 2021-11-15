@@ -181,6 +181,7 @@ hffi_smtype* hffi_new_smtype_harray_ptr(struct harray* array);
 void hffi_delete_smtype(hffi_smtype* type);
 
 hffi_smtype* hffi_smtype_cpoy(hffi_smtype* src);
+void hffi_smtype_ref(hffi_smtype* src, int c);
 
 //---------------- struct -----------------
 /**
@@ -213,6 +214,11 @@ hffi_struct* hffi_new_struct_from_list(struct array_list* member_types, char** m
 hffi_struct* hffi_new_struct_base(sint8* types, int count);
 
 void hffi_delete_structs(hffi_struct** cs, int count);
+
+//HFFI_STATE_OK for success
+int hffi_struct_get_base(hffi_struct* hs, int index, void* ptr);
+hffi_struct* hffi_struct_get_struct(hffi_struct* hs, int index);
+struct harray* hffi_struct_get_harray(hffi_struct* hs, int index);
 
 //----------------- manager -------------------
 

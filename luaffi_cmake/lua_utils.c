@@ -1,4 +1,5 @@
-#include "hffi_lua.h"
+
+#include "lua_utils.h"
 
 int hlua_get_int(lua_State* L, int idx, const char* key, int def_val){
     int t = lua_getfield(L, idx, key);
@@ -37,5 +38,64 @@ int hlua_rawgeti_int(lua_State* L, int tab_idx, int n){
     int v = luaL_checkinteger(L, -1);
     lua_pop(L, 1);
     return v;
+}
+
+#define CHECK_NEXT_ASPTR()\
+if(lua_rawgeti(L, 1, i + 2) == LUA_TBOOLEAN){\
+    asPtr = lua_toboolean(L, -1);\
+    /* i + 1 is the flag of ptr. */ \
+    i ++; \
+}else{\
+    asPtr = 0;\
+}\
+lua_pop(L, 1);
+
+#define CHECK_NEXT_AS_STRING()\
+if(lua_rawgeti(L, 1, i + 2) == LUA_TSTRING){\
+    array_list_add(sm_names, strdup(lua_tostring(L, -1)));\
+    i ++;\
+}else{\
+    array_list_add(sm_names, NULL);\
+}\
+lua_pop(L, 1);
+
+int build_smtypes(lua_State* L, array_list* sm_list, array_list* sm_names,
+                   Func_get_ptr_struct func_struct, Func_get_ptr_harray func_harray, Func_get_ptr_smtype func_smtype){
+    int len = lua_rawlen(L, 1);
+    int lua_t, asPtr;
+    hffi_smtype* tmp_smtype;
+    for(int i = 0 ; i < len; i++){
+        lua_t = lua_rawgeti(L, 1, i + 1);
+        if(lua_t == LUA_TNUMBER){
+            array_list_add(sm_list, hffi_new_smtype(luaL_checkinteger(L, -1)));
+            CHECK_NEXT_AS_STRING();
+        }else if(luaL_testudata(L, -1, __STR(hffi_struct))){
+            //may be ptr
+            CHECK_NEXT_ASPTR()
+            //check if have name.
+            CHECK_NEXT_AS_STRING();
+            //create smtype now.
+            tmp_smtype = asPtr ? hffi_new_smtype_struct_ptr((hffi_struct*)func_struct(L, -1))
+                               : hffi_new_smtype_struct((hffi_struct*)func_struct(L, -1));
+            array_list_add(sm_list, tmp_smtype);
+        }else if(luaL_testudata(L, -1, __STR(harray))){
+            //may be ptr
+            CHECK_NEXT_ASPTR()
+            CHECK_NEXT_AS_STRING();
+            tmp_smtype = asPtr ? hffi_new_smtype_harray_ptr(func_harray(L, -1))
+                               : hffi_new_smtype_harray(func_harray(L, -1));
+            array_list_add(sm_list, tmp_smtype);
+        }else if(luaL_testudata(L, -1, __STR(hffi_smtype))){
+            tmp_smtype = func_smtype(L, -1);
+            hffi_smtype_ref(tmp_smtype, 1);
+            array_list_add(sm_list, tmp_smtype);
+            CHECK_NEXT_AS_STRING();
+        }
+        else{
+            return HFFI_STATE_FAILED;
+        }
+        lua_pop(L, 1);
+    }
+    return HFFI_STATE_OK;
 }
 

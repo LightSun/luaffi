@@ -7,12 +7,7 @@
 #include "h_array.h"
 #include "h_string.h"
 
-extern int hlua_get_int(lua_State* L, int idx, const char* key, int def_val);
-extern int hlua_get_boolean(lua_State* L, int idx, const char* key, int def_val);
-extern int hlua_rawgeti_int(lua_State* L, int tab_idx, int n);
-
-#define _UNKNOWN_ "_unknown_"
-#define __STR(s) #s
+#include "lua_utils.h"
 
 #define REG_CLASS(L, C)                             \
     do {                                            \
@@ -77,19 +72,25 @@ static const BasePair _BASE_PAIRS[] = {
     {NULL, 0},
 };
 
+#define __INDEX_METHOD(name, func_lua)\
+if(strcmp(fun_name, name) == 0){\
+    lua_pushvalue(L, 1);\
+    lua_pushcclosure(L, func_lua, 1);\
+    return 1;\
+}
 /**
 ---------- harray->hffi_smtype->hffi_value-> hffi_struct-> hffi_cif
 ---------- dym_lib->dym_func -------
   */
 //-------------- share funcs --------------
 static void smtype_delete(void* d){
-    hffi_delete_smtype((hffi_smtype*)d);
+    if(d) hffi_delete_smtype((hffi_smtype*)d);
 }
 static void string_delete(void* d){
-    FREE(d);
+    if(d) FREE(d);
 }
 static void value_delete(void* d){
-    hffi_delete_value((hffi_value*)d);
+    if(d) hffi_delete_value((hffi_value*)d);
 }
 //------------------- harray --------------------
 
@@ -361,11 +362,7 @@ static int xffi_smtype_index(lua_State* L){
     //current support copy
     if(lua_type(L, 2) == LUA_TSTRING){
         const char* fun_name = lua_tostring(L, 2);
-        if(strcmp(fun_name, "copy") == 0){
-            lua_pushvalue(L, 1);
-            lua_pushcclosure(L, __smtype_cppy, 1);
-            return 1;
-        }
+        __INDEX_METHOD("copy", __smtype_cppy)
         return luaL_error(L, "unsupport method('%s') for smtype.", fun_name);
     }
     return luaL_error(L, "smtype doesn't support int index.");
@@ -420,58 +417,50 @@ static int xffi_smtype_new(lua_State* L){
                          "2, smtypes(table). 3, userdata(struct/array) + bool(as ptr or not).");
 }
 //----------------- struct ---------------
-static inline int get_base_type(const char* name){
-    const BasePair *lib;
-    for (lib = _BASE_PAIRS; lib->name; lib++) {
-        if(strcmp(lib->name, name) == 0){
-            return lib->type;
-        }
-    }
-    return -1;
-}
+//static inline int get_base_type(const char* name){
+//    const BasePair *lib;
+//    for (lib = _BASE_PAIRS; lib->name; lib++) {
+//        if(strcmp(lib->name, name) == 0){
+//            return lib->type;
+//        }
+//    }
+//    return -1;
+//}
 //SDL_KeyboardEvent = ffi.struct {
 //  uint32, "type";
 //  uint32, "timestamp";
 //  uint32, "windowID";
 //  uint8, "state";
+//  sint8, sint8; //just for padding.
 //  uint8, "repeat";
 //  uint8; uint8;  --padding
 //  SDL_Keysym, "keysym";
+//  SDL_Keysym, true, "keysym2";
 //}
 static int xffi_struct_new(lua_State *L){
-    sint8 sm_type;
     luaL_checktype(L, -1, LUA_TTABLE);
-    int len = lua_rawlen(L, -1);
-    if(len % 2 != 0){
-        return luaL_error(L, "table len must be 2n.");
-    }
+    if(lua_rawlen(L, -1) == 0) return 0;
+
     array_list* sm_list = array_list_new_simple();
     array_list* sm_names = array_list_new_simple();
-    for(int i = 0 ; i < len / 2; i++){
-        lua_rawgeti(L, -1, i * 2 + 1); //type (-2)
-        lua_rawgeti(L, -2, (i + 1)*2); //name (-1)
-        luaL_checkstring(L, -1);
-        if(lua_type(L, -2) == LUA_TNUMBER){
-            sm_type = (sint8)lua_tointeger(L, -2);
-            array_list_add(sm_list, hffi_new_smtype(sm_type));
-        }else{
-            if(luaL_testudata(L, -2, __STR(hffi_struct)) != 0){
-                array_list_add(sm_list, hffi_new_smtype_struct(get_ptr_hffi_struct(L, -2)));
-            }else{
-                array_list_delete2(sm_list, smtype_delete);
-                array_list_delete2(sm_names, string_delete);
-                return luaL_error(L, "wrong sm_type = %s", lua_tostring(L, -1));
-            }
-        }
-        array_list_add(sm_names, strdup(lua_tostring(L, -1)));
-        lua_pop(L, 2);
+
+    if(build_smtypes(L, sm_list, sm_names, get_ptr_hffi_struct, get_ptr_harray, get_ptr_hffi_smtype) == HFFI_STATE_FAILED){
+        array_list_delete2(sm_list, smtype_delete);
+        array_list_delete2(sm_names, string_delete);
+        return luaL_error(L, "build struct met unsupport data type.");
     }
+
     //msg
     char _m[128];
     char* msg[1];
     msg[0] = _m;
     //create struct
     hffi_struct* _struct = hffi_new_struct_from_list(sm_list, msg);
+    if(_struct == NULL){
+        array_list_delete2(sm_list, smtype_delete);
+        array_list_delete2(sm_names, string_delete);
+        return luaL_error(L, "create struct failed by '%s'", msg[0]);
+    }
     array_list_delete2(sm_list, smtype_delete);
     push_ptr_hffi_struct(L, _struct);
     lua_pushlightuserdata(L, sm_names);
@@ -486,9 +475,23 @@ static int xffi_struct_gc(lua_State *L){
     array_list_delete2(sm_names, string_delete);
     return 0;
 }
+static int __struct_copy(lua_State *L){
+    hffi_struct* hs = get_ptr_hffi_struct(L, lua_upvalueindex(1));
+    return push_ptr_hffi_struct(L, hffi_struct_copy(hs));
+}
+static int xffi_struct_index(lua_State *L){
+    //TODO
+    if(lua_type(L, 2) == LUA_TSTRING){
+        const char* fun_name = lua_tostring(L, 2);
+        __INDEX_METHOD("copy", __struct_copy)
+        return luaL_error(L, "unsupport method('%s') for smtype.", fun_name);
+    }
+    return 0;
+}
 
 static const luaL_Reg g_hffi_struct_Methods[] = {
     {"__gc", xffi_struct_gc},
+    {"__index", xffi_struct_index},
     {NULL, NULL}
 };
 //------------------ hffi_value ------------
@@ -611,7 +614,7 @@ static int xffi_value_get(lua_State *L){
         harray_ref(hy, 1);
         return push_ptr_harray(L, hy);
     }
-    //the value may create from ptr-ptr. you should ensure.
+    //base type or base's one-level-ptr.
     int ffi_t = val->base_ffi_type;
     if(ffi_t == HFFI_TYPE_POINTER){
         ffi_t = val->pointer_base_type;
