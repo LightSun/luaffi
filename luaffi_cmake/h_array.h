@@ -11,6 +11,7 @@ struct hstring;
 typedef struct harray{
     void* data;
     sint8 hffi_t;
+    sint8 free_data;
     int data_size;
     int ele_count;  //element count
     int VOLATIE ref;
@@ -53,6 +54,9 @@ harray* harray_new_chars(const char* str);
 
 //create array as fix length. and copy str to it.
 harray* harray_new_chars2(const char* str, int len);
+
+//free_data: true to free data on recycle.
+harray* harray_new_from_data(sint8 hffi_t, void* data, int data_size, int ele_count, sint8 free_data);
 
 harray* harray_copy(harray* src);
 void harray_delete(harray* arr);

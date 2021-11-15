@@ -502,19 +502,31 @@ static int xffi_value_new(lua_State *L){
     hffi_value* val = NULL;
     switch (lua_type(L, 1)) {
     case LUA_TNUMBER:{
-        sint8 type = (sint8)luaL_checkinteger(L, 1);
+        sint8 type = (sint8)luaL_checkinteger(L, 1);       
+        //ptr
         if(type == HFFI_TYPE_POINTER){
             type = (sint8)luaL_checkinteger(L, 2);
-            if(lua_gettop(L) >= 3){ //has val
-                if(type == HFFI_TYPE_FLOAT || type == HFFI_TYPE_DOUBLE){
-                    lua_Number num = lua_tonumber(L, 3);
-                    val = hffi_new_value_ptr2(type, &num);
+            if(lua_gettop(L) >= 3){
+                if(lua_type(L, 3) == LUA_TBOOLEAN){
+                    //bool: indicate alloc val.ptr or not
+                    if(lua_toboolean(L, 3)){
+                        val = hffi_new_value_ptr_no_data(type);
+                    }else{
+                        val = hffi_new_value_ptr(type);
+                    }
                 }else{
-                    lua_Integer num = lua_tointeger(L, 3);
-                    val = hffi_new_value_ptr2(type, &num);
+                    //has val
+                    if(type == HFFI_TYPE_FLOAT || type == HFFI_TYPE_DOUBLE){
+                        lua_Number num = lua_tonumber(L, 3);
+                        val = hffi_new_value_ptr2(type, &num);
+                    }else{
+                        lua_Integer num = lua_tointeger(L, 3);
+                        val = hffi_new_value_ptr2(type, &num);
+                    }
                 }
             }else{
-                 val = hffi_new_value_ptr(type);
+                //only pointer and type
+                val = hffi_new_value_ptr(type);
             }
         }else{
             if(lua_gettop(L) >= 2){ //hasVal = 1;
@@ -565,6 +577,53 @@ static int xffi_value_new(lua_State *L){
 static int xffi_value_gc(lua_State *L){
     hffi_value* val = get_ptr_hffi_value(L, 1);
     hffi_delete_value(val);
+    return 0;
+}
+static int xffi_value_get(lua_State *L){
+    hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
+    //int rows, int cols, int continue_mem, int share_mem
+    hffi_struct* hs = hffi_value_get_struct(val);
+    if(hs != NULL){
+        hffi_struct_ref(hs, 1);
+        return push_ptr_hffi_struct(L, hs);
+    }
+    harray* hy = hffi_value_get_harray(val);
+    if(hy != NULL){
+        harray_ref(hy, 1);
+        return push_ptr_harray(L, hy);
+    }
+    //TODO
+    return 0;
+}
+static int xffi_value_get_as_array(lua_State *L){
+    hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
+    //int rows, int cols, int continue_mem, int share_mem
+
+    return 0;
+}
+static int xffi_value_copy(lua_State *L){
+    hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
+    return push_ptr_hffi_value(L, hffi_value_copy(val));
+}
+static int xffi_value_index(lua_State *L){
+    if(lua_type(L, 2) == LUA_TSTRING){
+        const char* fun_name = lua_tostring(L, 2);
+        if(strcmp(fun_name, "copy") == 0){
+            lua_pushvalue(L, 1);
+            lua_pushcclosure(L, xffi_value_copy, 1);
+            return 1;
+        }
+        if(strcmp(fun_name, "get") == 0){
+            lua_pushvalue(L, 1);
+            lua_pushcclosure(L, xffi_value_get, 1);
+            return 1;
+        }
+        if(strcmp(fun_name, "xffi_value_get_as_array") == 0){
+            lua_pushvalue(L, 1);
+            lua_pushcclosure(L, xffi_value_get, 1);
+            return 1;
+        }
+    }
     return 0;
 }
 

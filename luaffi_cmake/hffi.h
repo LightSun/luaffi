@@ -83,6 +83,8 @@ ffi_type* to_ffi_type(int8_t ffi_t, char** error_msg);
 
 //only alloc base needed memory.
 hffi_value* hffi_new_value_ptr(sint8 hffi_t2);
+/* create value. without data. that means the data will be allocate by an extra function. */
+hffi_value* hffi_new_value_ptr_no_data(sint8 hffi_t2);
 //auto alloc memory for target size
 hffi_value* hffi_new_value(sint8 hffi_t1, sint8 hffi_t2, int size);
 hffi_new_value_auto_x_def(sint8)
@@ -139,10 +141,12 @@ ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg);
 
 /** get value as base value. */
 int hffi_value_get_base(hffi_value* val, void* out_ptr);
-//TODO permit cast ptr(like int**) to direct array?
 
 hffi_struct* hffi_value_get_struct(hffi_value* c);
 struct harray* hffi_value_get_harray(hffi_value* val);
+
+/** only used for pointer.,  continueMemory: sometimes, some memory malloc split for array-array. */
+struct harray* hffi_value_get_pointer_as_array(hffi_value* val, int rows, int cols, int continue_mem, int share_mem);
 
 /**
  * @brief hffi_call: do call ffi.

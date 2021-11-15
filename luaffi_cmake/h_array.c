@@ -31,6 +31,7 @@ harray* harray_new_structs(struct array_list* structs){
     if(count == 0) return NULL;
     int every_size = hffi_struct_get_data_size(array_list_get(structs, 0));
     harray* arr = MALLOC(sizeof (harray));
+    arr->free_data = 1;
     arr->ele_count = count;
     arr->data_size = count * every_size;
     arr->data = MALLOC(arr->data_size);
@@ -56,6 +57,7 @@ harray* harray_new_arrays(struct array_list* arrays){
     if(count == 0) return NULL;
     int every_size = ((harray*)array_list_get(arrays, 0))->data_size;
     harray* arr = MALLOC(sizeof (harray));
+    arr->free_data = 1;
     arr->ele_count = count;
     arr->data_size = count * every_size;
     arr->data = MALLOC(arr->data_size);
@@ -85,6 +87,7 @@ harray* harray_new_array_ptr(int count){
 harray* harray_new(sint8 hffi_t, int count){
     int ele_size = get_element_size(hffi_t);
     harray* arr = MALLOC( sizeof (harray));
+    arr->free_data = 1;
     arr->hffi_t = hffi_t;
     arr->data = MALLOC(ele_size * count);
     arr->data_size = ele_size * count;
@@ -123,8 +126,31 @@ harray* harray_new_chars2(const char* str, int len){
     memcpy(arr->data, str, strlen(str));
     return arr;
 }
+harray* harray_new_from_data(sint8 hffi_t, void* data, int data_size, int ele_count, sint8 free_data){
+    harray* arr = MALLOC( sizeof (harray));
+    arr->free_data = free_data;
+    arr->data_size = data_size;
+    arr->ele_count = ele_count;
+    arr->hffi_t = hffi_t;
+    arr->data = data;
+    arr->ref = 1;
+
+    switch (hffi_t) {
+    case HFFI_TYPE_STRUCT_PTR:
+    case HFFI_TYPE_STRUCT:
+    case HFFI_TYPE_HARRAY_PTR:
+    case HFFI_TYPE_HARRAY:{
+        arr->ele_list = MALLOC(sizeof (void*) * ele_count);
+        memset(arr->ele_list, 0 , sizeof (sizeof (void*) * ele_count));
+    }break;
+    default:
+        arr->ele_list = NULL;
+    }
+    return arr;
+}
 harray* harray_copy(harray* src){
     harray* arr = MALLOC( sizeof (harray));
+    arr->free_data = 1;
     arr->ele_list = NULL;
     arr->hffi_t = src->hffi_t;
     arr->data = MALLOC(src->data_size);
@@ -139,26 +165,42 @@ harray* harray_copy(harray* src){
         {
             memcpy(arr->data, src->data, src->data_size);
             for(int i = 0 ; i < src->ele_count ; i ++){
-                arr->ele_list[i] = harray_copy((harray*)src->ele_list[i]);
+                if(src->ele_list[i]){
+                    arr->ele_list[i] = harray_copy((harray*)src->ele_list[i]);
+                }else{
+                    arr->ele_list[i] = NULL;
+                }
             }
         }break;
         case HFFI_TYPE_HARRAY_PTR:
         {
             for(int i = 0 ; i < src->ele_count ; i ++){
-                ((void**)arr->data)[i] = arr->ele_list[i] = harray_copy((harray*)src->ele_list[i]);
+                if(src->ele_list[i]){
+                    ((void**)arr->data)[i] = arr->ele_list[i] = harray_copy((harray*)src->ele_list[i]);
+                }else{
+                    ((void**)arr->data)[i] = arr->ele_list[i] = NULL;
+                }
             }
         }break;
 
         case HFFI_TYPE_STRUCT:{
             memcpy(arr->data, src->data, src->data_size);
             for(int i = 0 ; i < src->ele_count ; i ++){
-                arr->ele_list[i] = hffi_struct_copy((struct hffi_struct*)src->ele_list[i]);
+                 if(src->ele_list[i]){
+                     arr->ele_list[i] = hffi_struct_copy((struct hffi_struct*)src->ele_list[i]);
+                 }else{
+                     arr->ele_list[i] = NULL;
+                 }
             }
         }break;
 
         case HFFI_TYPE_STRUCT_PTR:{
             for(int i = 0 ; i < src->ele_count ; i ++){
-                ((void**)arr->data)[i] = arr->ele_list[i] = hffi_struct_copy((struct hffi_struct*)src->ele_list[i]);
+                if(src->ele_list[i]){
+                    ((void**)arr->data)[i] = arr->ele_list[i] = hffi_struct_copy((struct hffi_struct*)src->ele_list[i]);
+                }else{
+                    ((void**)arr->data)[i] = arr->ele_list[i] = NULL;
+                }
             }
         }break;
 
@@ -171,11 +213,13 @@ harray* harray_copy(harray* src){
     return arr;
 }
 static inline void __delete_ele(void* ud,void* ele){
-    int hffi_t = *((int*)ud);
-    if(hffi_t == HFFI_TYPE_HARRAY || hffi_t == HFFI_TYPE_HARRAY_PTR){
-        harray_delete((harray*)ele);
-    }else if(hffi_t == HFFI_TYPE_STRUCT || hffi_t == HFFI_TYPE_STRUCT_PTR){
-        hffi_delete_struct((struct hffi_struct*)ele);
+    if(ele){
+        int hffi_t = *((int*)ud);
+        if(hffi_t == HFFI_TYPE_HARRAY || hffi_t == HFFI_TYPE_HARRAY_PTR){
+            harray_delete((harray*)ele);
+        }else if(hffi_t == HFFI_TYPE_STRUCT || hffi_t == HFFI_TYPE_STRUCT_PTR){
+            hffi_delete_struct((struct hffi_struct*)ele);
+        }
     }
 }
 void harray_delete(harray* arr){
@@ -183,11 +227,15 @@ void harray_delete(harray* arr){
         int hffi_t = arr->hffi_t;
         if(arr->ele_list){
             for(int i = 0 ; i < arr->ele_count ; i ++){
-                __delete_ele(&hffi_t, arr->ele_list[i]);
+                if(arr->ele_list[i]){
+                    __delete_ele(&hffi_t, arr->ele_list[i]);
+                }
             }
             FREE(arr->ele_list);
         }
-        FREE(arr->data);
+        if(arr->free_data){
+            FREE(arr->data);
+        }
         FREE(arr);
     }
 }

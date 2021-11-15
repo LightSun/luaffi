@@ -179,14 +179,7 @@ ffi_type* to_ffi_type(int8_t v, char** msg){
 //---------------------------------------------------------------
 //------------------------- value ------------------------
 hffi_value* hffi_new_value_ptr(sint8 hffi_t2){
-    hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
-    memset(val_ptr, 0, sizeof (hffi_value));
-
-    val_ptr->ptr = MALLOC(sizeof (void*));
-    val_ptr->base_ffi_type = FFI_TYPE_POINTER;
-    val_ptr->pointer_base_type = hffi_t2;
-    val_ptr->ref = 1;
-    return val_ptr;
+    return hffi_new_value(FFI_TYPE_POINTER, hffi_t2, sizeof (void*));
 }
 hffi_value* hffi_new_value(sint8 hffi_t, sint8 hffi_t2, int size){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
@@ -195,6 +188,15 @@ hffi_value* hffi_new_value(sint8 hffi_t, sint8 hffi_t2, int size){
     val_ptr->base_ffi_type = hffi_t;
     val_ptr->pointer_base_type = hffi_t2;
     val_ptr->ref = 1;   
+    return val_ptr;
+}
+hffi_value* hffi_new_value_ptr_no_data(sint8 hffi_t2){
+    hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
+    memset(val_ptr, 0, sizeof (hffi_value));
+    val_ptr->ptr = NULL;
+    val_ptr->base_ffi_type = HFFI_TYPE_POINTER;
+    val_ptr->pointer_base_type = hffi_t2;
+    val_ptr->ref = 1;
     return val_ptr;
 }
 
@@ -451,7 +453,63 @@ harray* hffi_value_get_harray(hffi_value* val){
     }
     return NULL;
 }
-
+/** continueMemory: sometimes, some memory malloc split for array-array. */
+harray* hffi_value_get_pointer_as_array(hffi_value* val, int rows, int cols,int continue_mem, int share_memory){
+    switch (val->pointer_base_type) {
+    case HFFI_TYPE_SINT8:{
+        if(cols == 0){//int* a = ..., ptr = a
+            int len = rows * sizeof (sint8);
+            void* data;
+            if(share_memory){
+                data = val->ptr;
+            }else{
+                data = MALLOC(len);
+                memcpy(data, val->ptr, len);
+            }
+            return harray_new_from_data(HFFI_TYPE_SINT8, data, len, rows, !share_memory);
+        }else{
+            harray* arr; harray* tmp_arr;
+            if(continue_mem){
+                //int** a = ..., ptr = a
+                int len = rows * cols * sizeof (sint8);
+                void* data;
+                if(share_memory){
+                    data = val->ptr;
+                }else{
+                    data = MALLOC(len);
+                    memcpy(data, val->ptr, len);
+                }
+                arr = harray_new_from_data(HFFI_TYPE_HARRAY, data, len, rows, !share_memory);
+                sint8** sd = data;
+                for(int i = 0 ; i < rows ; i ++){
+                    tmp_arr = harray_new_from_data(HFFI_TYPE_SINT8, sd[i], cols * sizeof (sint8), cols, 0);
+                    tmp_arr->ref = 0;
+                    harray_seti2(arr, i, tmp_arr);
+                }
+            }else{
+                //int** a = malloc...., *a[0] = malloc..., *a[1] = malloc...,  ptr = a;
+                int len = rows * cols * sizeof (void*);
+                void* data;
+                if(share_memory){
+                    data = val->ptr;
+                }else{
+                    data = MALLOC(len);
+                    memcpy(data, val->ptr, len);
+                }
+                arr = harray_new_from_data(HFFI_TYPE_HARRAY_PTR, data, len, rows, !share_memory);
+                //no continue memory. the data[i] need free.
+                for(int i = 0 ; i < rows ; i ++){
+                    tmp_arr = harray_new_from_data(HFFI_TYPE_SINT8, ((void**)data)[i], cols * sizeof (sint8), cols, 1);
+                    tmp_arr->ref = 0;
+                    harray_seti2(arr, i, tmp_arr);
+                }
+            }
+            return arr;
+        }
+    }break;
+    }
+    return NULL;
+}
 //----------------------------- ------------------------------
 static inline void* __get_data_ptr(hffi_value* v){
     switch (v->base_ffi_type) {
