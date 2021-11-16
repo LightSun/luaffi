@@ -69,6 +69,21 @@ typedef unsigned long long uint64;
 #define H_UNSED(x) (void)x;
 #define H_UNSED2(x,y) H_UNSED(x) H_UNSED(y)
 
+#define DEF_HFFI_BASE_SWITCH(macro, ffi_t)\
+switch (ffi_t) {\
+macro(HFFI_TYPE_SINT8, sint8)\
+macro(HFFI_TYPE_UINT8, uint8)\
+macro(HFFI_TYPE_SINT16, sint16)\
+macro(HFFI_TYPE_UINT16, uint16)\
+macro(HFFI_TYPE_SINT32, sint32)\
+macro(HFFI_TYPE_UINT32, uint32)\
+macro(HFFI_TYPE_SINT64, sint64)\
+macro(HFFI_TYPE_UINT64, uint64)\
+macro(HFFI_TYPE_FLOAT, float)\
+macro(HFFI_TYPE_DOUBLE, double)\
+macro(HFFI_TYPE_INT, sint32)\
+}
+
 struct hffi_struct;
 
 void hffi_delete_struct(struct hffi_struct* c);

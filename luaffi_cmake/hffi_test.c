@@ -15,6 +15,18 @@ int testFunc2_1(int* m, int n){
     return n;
 }
 void hffi_test2(){
+    printf("--------- hffi_test2 -------\n");
+    int a = 5;
+    int b = 10;
+    int* data = malloc(sizeof(void*));
+    data[0] = 1;
+    data[1] = 2;
+    void **d = (void**)data;
+    d[0] = &a;
+    d[1] = &b;
+
+    free(data);
+
     printf("----------- hffi_test2 ---------- \n");
     hffi_value* val1 = hffi_new_value_ptr(FFI_TYPE_SINT32);
     hffi_value* val2 = hffi_new_value_int(5);

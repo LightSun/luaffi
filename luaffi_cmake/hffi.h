@@ -1,4 +1,5 @@
-
+#ifndef H_FFI_H
+#define H_FFI_H
 #include "hffi_common.h"
 
 #define hffi_new_value_auto_x_def(type) \
@@ -142,12 +143,13 @@ ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg);
 
 /** get value as base value. like int/char/in* /char* /... etc. */
 int hffi_value_get_base(hffi_value* val, void* out_ptr);
-
 hffi_struct* hffi_value_get_struct(hffi_value* c);
 struct harray* hffi_value_get_harray(hffi_value* val);
-
 /** only used for pointer.,  continueMemory: sometimes, some memory malloc split for array-array. */
 struct harray* hffi_value_get_pointer_as_array(hffi_value* val, int rows, int cols, int continue_mem, int share_mem);
+
+//--------- for test ----------
+int hffi_value_set_base(hffi_value* val, void* in_ptr);
 
 /**
  * @brief hffi_call: do call ffi.
@@ -259,4 +261,5 @@ hffi_value* hffi_cif_get_result_value(hffi_cif* hcif);
 hffi_value* hffi_cif_get_param_value(hffi_cif* hcif, int index);
 int hffi_cif_get_param_count(hffi_cif* hcif);
 
+#endif
 //load lib can like: https://github.com/chfoo/callfunc/blob/ef79a3985be728c42914320ddfc30f9e764f838e/src/c/callfunc.c

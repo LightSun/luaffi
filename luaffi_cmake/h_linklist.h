@@ -1,6 +1,19 @@
 #ifndef _H_LINKLIST_H
 #define _H_LINKLIST_H
 
+//x >>>  eg: func_data(old->data);
+#define RELEASE_LINK_LIST(list, x) \
+if(list){\
+    linklist_node* node = list;\
+    linklist_node* old;\
+    do{\
+        old = node;\
+        node = node->next;\
+        {x;}\
+        FREE(old);\
+    }while(node != NULL);\
+}
+
 //impl of link list
 typedef struct linklist_node {
     void *data;

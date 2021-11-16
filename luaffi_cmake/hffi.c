@@ -293,38 +293,12 @@ hffi_value_get_auto_x(float)
 hffi_value_get_auto_x(double)
 
 hffi_value* hffi_new_value_raw_type2(sint8 ffi_t, void* val_ptr){
-    switch (ffi_t) {
-    DEF_NEW_VALUE_RAW(HFFI_TYPE_SINT8, sint8)
-    DEF_NEW_VALUE_RAW(HFFI_TYPE_UINT8, uint8)
-    DEF_NEW_VALUE_RAW(HFFI_TYPE_SINT16, sint16)
-    DEF_NEW_VALUE_RAW(HFFI_TYPE_UINT16, uint16)
-    DEF_NEW_VALUE_RAW(HFFI_TYPE_SINT32, sint32)
-    DEF_NEW_VALUE_RAW(HFFI_TYPE_UINT32, uint32)
-    DEF_NEW_VALUE_RAW(HFFI_TYPE_SINT64, sint64)
-    DEF_NEW_VALUE_RAW(HFFI_TYPE_UINT64, uint64)
-    DEF_NEW_VALUE_RAW(HFFI_TYPE_FLOAT, float)
-    DEF_NEW_VALUE_RAW(HFFI_TYPE_DOUBLE, double)
-    DEF_NEW_VALUE_RAW(HFFI_TYPE_INT, int)
-    default:
-        return NULL;
-    }
+    DEF_HFFI_BASE_SWITCH(DEF_NEW_VALUE_RAW, ffi_t)
+    return NULL;
 }
 hffi_value* hffi_new_value_ptr2(sint8 ffi_t, void* val_ptr){
-    switch (ffi_t) {
-    DEF_NEW_VALUE_PTR2(HFFI_TYPE_SINT8, sint8)
-    DEF_NEW_VALUE_PTR2(HFFI_TYPE_UINT8, uint8)
-    DEF_NEW_VALUE_PTR2(HFFI_TYPE_SINT16, sint16)
-    DEF_NEW_VALUE_PTR2(HFFI_TYPE_UINT16, uint16)
-    DEF_NEW_VALUE_PTR2(HFFI_TYPE_SINT32, sint32)
-    DEF_NEW_VALUE_PTR2(HFFI_TYPE_UINT32, uint32)
-    DEF_NEW_VALUE_PTR2(HFFI_TYPE_SINT64, sint64)
-    DEF_NEW_VALUE_PTR2(HFFI_TYPE_UINT64, uint64)
-    DEF_NEW_VALUE_PTR2(HFFI_TYPE_FLOAT, float)
-    DEF_NEW_VALUE_PTR2(HFFI_TYPE_DOUBLE, double)
-    DEF_NEW_VALUE_PTR2(HFFI_TYPE_INT, int)
-    default:
-        return NULL;
-    }
+    DEF_HFFI_BASE_SWITCH(DEF_NEW_VALUE_PTR2, ffi_t)
+    return NULL;
 }
 
 hffi_value* hffi_new_value_raw_type(sint8 ffi_t){
@@ -472,27 +446,16 @@ int hffi_value_get_base(hffi_value* val, void* out_ptr){
     if(ffi_t == HFFI_TYPE_POINTER){
         ffi_t = val->pointer_base_type;
     }
-    switch (ffi_t) {
-    case HFFI_TYPE_STRUCT:
-    case HFFI_TYPE_HARRAY:
-    case HFFI_TYPE_POINTER:{
-       return HFFI_STATE_FAILED;
-    }break;
-
-    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_SINT8, sint8)
-    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_UINT8, uint8)
-    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_SINT16, sint16)
-    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_UINT16, uint16)
-    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_SINT32, sint32)
-    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_UINT32, uint32)
-    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_SINT64, sint64)
-    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_UINT64, uint64)
-    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_FLOAT, float)
-    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_DOUBLE, double)
-    DEF_VALUE_GET_BASE_IMPL(HFFI_TYPE_INT, int)
-
-    default:{}break;
-    }
+    DEF_HFFI_BASE_SWITCH(DEF_VALUE_GET_BASE_IMPL, ffi_t);
+    return HFFI_STATE_FAILED;
+}
+int hffi_value_set_base(hffi_value* val, void* in_ptr){
+#define DEF_hffi_value_set_base_impl(ffi_t, type)\
+case ffi_t:{\
+    *((type*)val->ptr) = *((type*)in_ptr);\
+    return HFFI_STATE_OK;\
+}break;
+    DEF_HFFI_BASE_SWITCH(DEF_hffi_value_set_base_impl, val->base_ffi_type)
     return HFFI_STATE_FAILED;
 }
 ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg){
@@ -1111,6 +1074,7 @@ int hffi_struct_get_base(hffi_struct* hs, int index, void* ptr){
 #define DEF__struct_get_base(ffi_t, type)\
     case ffi_t:{\
     *((type*)ptr) = ((type*)data_ptr)[0];\
+    return HFFI_STATE_OK;\
 }break;
 
     if(index >= hs->count) return HFFI_STATE_FAILED;
@@ -1118,19 +1082,7 @@ int hffi_struct_get_base(hffi_struct* hs, int index, void* ptr){
     size_t * offsets = (size_t *) &hs->type->elements[hs->count+1];
     void* data_ptr = hs->data + offsets[index];
     //TODO if is base pointer. don't know if is base simple str.
-    switch (ffi_t) {
-    DEF__struct_get_base(HFFI_TYPE_SINT8, sint8)
-    DEF__struct_get_base(HFFI_TYPE_UINT8, uint8)
-    DEF__struct_get_base(HFFI_TYPE_SINT16, sint16)
-    DEF__struct_get_base(HFFI_TYPE_UINT16, uint16)
-    DEF__struct_get_base(HFFI_TYPE_SINT32, sint32)
-    DEF__struct_get_base(HFFI_TYPE_UINT32, uint32)
-    DEF__struct_get_base(HFFI_TYPE_SINT64, sint64)
-    DEF__struct_get_base(HFFI_TYPE_UINT64, uint64)
-    DEF__struct_get_base(HFFI_TYPE_FLOAT, float)
-    DEF__struct_get_base(HFFI_TYPE_DOUBLE, double)
-    DEF__struct_get_base(HFFI_TYPE_INT, int)
-    }
+    DEF_HFFI_BASE_SWITCH(DEF__struct_get_base, ffi_t);
     return HFFI_STATE_FAILED;
 }
 
@@ -1138,7 +1090,8 @@ int hffi_struct_get_base_for_simple_ptr(hffi_struct* hs, int index, void* ptr){
 #define DEF__struct_get_base_ptr(ffi_t, type)\
 case ffi_t:{\
      void* _ptr = ((void**)data_ptr)[0];\
-     *((type*)ptr) = ((type*)_ptr)[0];\
+     *((type*)ptr) = *((type*)_ptr);\
+     return HFFI_STATE_OK;\
 }break;
 
     if(index >= hs->count) return HFFI_STATE_FAILED;
@@ -1146,19 +1099,7 @@ case ffi_t:{\
     size_t * offsets = (size_t *) &hs->type->elements[hs->count+1];
     void* data_ptr = hs->data + offsets[index];
     //TODO test
-    switch (ffi_t) {
-    DEF__struct_get_base_ptr(HFFI_TYPE_SINT8, sint8)
-    DEF__struct_get_base_ptr(HFFI_TYPE_UINT8, uint8)
-    DEF__struct_get_base_ptr(HFFI_TYPE_SINT16, sint16)
-    DEF__struct_get_base_ptr(HFFI_TYPE_UINT16, uint16)
-    DEF__struct_get_base_ptr(HFFI_TYPE_SINT32, sint32)
-    DEF__struct_get_base_ptr(HFFI_TYPE_UINT32, uint32)
-    DEF__struct_get_base_ptr(HFFI_TYPE_SINT64, sint64)
-    DEF__struct_get_base_ptr(HFFI_TYPE_UINT64, uint64)
-    DEF__struct_get_base_ptr(HFFI_TYPE_FLOAT, float)
-    DEF__struct_get_base_ptr(HFFI_TYPE_DOUBLE, double)
-    DEF__struct_get_base_ptr(HFFI_TYPE_INT, int)
-    }
+    DEF_HFFI_BASE_SWITCH(DEF__struct_get_base_ptr, ffi_t);
     return HFFI_STATE_FAILED;
 }
 //type must be the real data type
@@ -1168,26 +1109,13 @@ harray* hffi_struct_get_as_array(hffi_struct* hs, int index, sint8 type,int rows
 
     size_t * offsets = (size_t *) &hs->type->elements[hs->count+1];
     void* data_ptr = hs->data + offsets[index];
-    void* _ptr = ((void**)data_ptr)[0];
 
-    return hffi_get_pointer_as_array_impl(type, _ptr, rows, cols, continue_mem, share_memory);
+    return hffi_get_pointer_as_array_impl(type, data_ptr, rows, cols, continue_mem, share_memory);
 }
 
 // return hffi_get_pointer_as_array_impl(val->pointer_base_type, val->ptr, rows, cols, continue_mem, share_memory);
 
 //--------------------------------------------
-//x  eg: func_data(old->data);
-#define RELEASE_LINK_LIST(list, x) \
-if(list){\
-    linklist_node* node = list;\
-    linklist_node* old;\
-    do{\
-        old = node;\
-        node = node->next;\
-        {x;}\
-        FREE(old);\
-    }while(node != NULL);\
-}
 #define ADD_VAL_TO_MANAGER(vals, c)\
 if(hm->vals == NULL){\
     hm->vals = linklist_create(v);\

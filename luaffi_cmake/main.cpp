@@ -18,7 +18,9 @@ void hffi_test_struct2();
 void hffi_test_struct3();
 void test_call_unions();
 void test_harray();
+int hffi_test_value1(int argc,char **argv);
 }
+
 
 #define CALL_LUA(L, func)\
 {int s = func(L);\
@@ -53,8 +55,9 @@ static void test_ffi_all(){
     hffi_test_struct2();
     hffi_test_struct3();
     test_call_unions();
+    hffi_test_value1(0, NULL);
 }
-
+//int argc,char **argv
 extern "C" int main()
 {
     //cout << "Hello World!" << endl;

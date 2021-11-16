@@ -32,6 +32,7 @@ void calCircleArea(ffi_cif * cif,
     printf("calCircleArea >>> area:%.2f,  *ret = %.2f\n", area, *ret);
 }
 void testClosure(){
+   printf("-------- testClosure --------\n");
    ffi_cif cif;
    ffi_type *args[1];
    ffi_closure *closure;
@@ -63,6 +64,7 @@ void testClosure(){
    ffi_closure_free(closure);   //释放闭包
 }
 void testCall2(){
+    printf("------- testCall2 ------ \n");
     void* functionPtr = &testFunc2;
     int argCount = 2;
     //param types
@@ -102,6 +104,7 @@ void testCall2(){
 }
 
 void testCall() {
+    printf("------------ testCall------ \n");
     testFunc(1, 2);
 
     //拿函数指针

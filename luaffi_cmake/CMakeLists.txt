@@ -5,6 +5,15 @@ project(luaffi_app LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+SET(gTest_enabled true)
+if(gTest_enabled)
+    include_directories(D:/study/github/thirds/googletest-release-1.11.0/googletest/include)
+    set(gTest_lib_dir D:/study/github/thirds/googletest-release-1.11.0/googletest/build_out)
+    #link_directories(${gTest_lib_dir}/release/libgtest.a)
+    #set(gTest_libs gtest)
+    set(gTest_libs ${gTest_lib_dir}/release/libgtest.a)
+endif()
+
 add_subdirectory(lua-5.3.6)
 
 include_directories(lua-5.3.6/src)
@@ -12,7 +21,8 @@ include_directories(lua-5.3.6/src)
 add_library(ffi2 STATIC ffi2.h ffi.c ffi_ext.c)
 
 # USE_C11_ATOMICS,USE_MSC_ATOMICS,USE_GCC_ATOMICS,USE_PTHREAD_ATOMICS
-add_executable(luaffi_app
+
+SET(SRC_HFFI
     hffi_common.h
     h_alloctor.h
     h_alloctor.c
@@ -44,6 +54,19 @@ add_executable(luaffi_app
     main.cpp
     )
 
+if(gTest_enabled)
+    set(SRC_HFFI ${SRC_HFFI}
+         hffi_test_value.cpp
+        )
+endif()
+
+add_executable(luaffi_app
+    ${SRC_HFFI}
+    )
+
 target_link_libraries(ffi2 lua ffi)
 target_link_libraries(luaffi_app ffi2 lua)
-target_compile_definitions(luaffi_app PRIVATE STRUCT_MAX_MEMBER=16)
+if(gTest_enabled)
+    target_link_libraries(luaffi_app ${gTest_libs})
+endif()
+#target_compile_definitions(luaffi_app PRIVATE STRUCT_MAX_MEMBER=16)

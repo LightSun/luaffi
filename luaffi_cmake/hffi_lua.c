@@ -444,7 +444,8 @@ static int xffi_struct_new(lua_State *L){
     array_list* sm_list = array_list_new_simple();
     array_list* sm_names = array_list_new_simple();
 
-    if(build_smtypes(L, sm_list, sm_names, get_ptr_hffi_struct, get_ptr_harray, get_ptr_hffi_smtype) == HFFI_STATE_FAILED){
+    if(build_smtypes(L, sm_list, sm_names, get_ptr_hffi_struct,
+                     get_ptr_harray, get_ptr_hffi_smtype) == HFFI_STATE_FAILED){
         array_list_delete2(sm_list, smtype_delete);
         array_list_delete2(sm_names, string_delete);
         return luaL_error(L, "build struct met unsupport data type.");

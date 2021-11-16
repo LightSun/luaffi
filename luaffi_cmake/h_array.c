@@ -99,7 +99,7 @@ harray* harray_new(sint8 hffi_t, int count){
     case HFFI_TYPE_HARRAY_PTR:
     case HFFI_TYPE_HARRAY:{
         arr->ele_list = MALLOC(sizeof (void*) * count);
-        memset(arr->ele_list, 0 , sizeof (sizeof (void*) * count));
+        memset(arr->ele_list, 0, sizeof (void*) * count);
     }break;
     default:
         arr->ele_list = NULL;
@@ -255,19 +255,8 @@ int harray_geti(harray* arr, int index, union harray_ele* ptr){
     if(index >= arr->ele_count){
         return HFFI_STATE_FAILED;
     }
-    switch (arr->hffi_t) {
-        __GET_I(HFFI_TYPE_SINT8, sint8)
-        __GET_I(HFFI_TYPE_UINT8, uint8)
-        __GET_I(HFFI_TYPE_SINT16, sint16)
-        __GET_I(HFFI_TYPE_UINT16, uint16)
-        __GET_I(HFFI_TYPE_SINT32, sint32)
-        __GET_I(HFFI_TYPE_UINT32, uint32)
-        __GET_I(HFFI_TYPE_SINT64, sint64)
-        __GET_I(HFFI_TYPE_UINT64, uint64)
-        __GET_I(HFFI_TYPE_FLOAT, float)
-        __GET_I(HFFI_TYPE_DOUBLE, double)
-        __GET_I(HFFI_TYPE_INT, sint32)
-
+    DEF_HFFI_BASE_SWITCH(__GET_I, arr->hffi_t)
+    switch (arr->hffi_t) {       
         case HFFI_TYPE_STRUCT_PTR:
         case HFFI_TYPE_HARRAY_PTR:{
             if(arr->ele_list == NULL){
@@ -324,19 +313,9 @@ int harray_seti(harray* arr, int index, union harray_ele* ptr){
     if(index >= arr->ele_count){
         return HFFI_STATE_FAILED;
     }
-    switch (arr->hffi_t) {
-    __SET_I(HFFI_TYPE_SINT8, sint8)
-    __SET_I(HFFI_TYPE_UINT8, uint8)
-    __SET_I(HFFI_TYPE_SINT16, sint16)
-    __SET_I(HFFI_TYPE_UINT16, uint16)
-    __SET_I(HFFI_TYPE_SINT32, sint32)
-    __SET_I(HFFI_TYPE_UINT32, uint32)
-    __SET_I(HFFI_TYPE_SINT64, sint64)
-    __SET_I(HFFI_TYPE_UINT64, uint64)
+    DEF_HFFI_BASE_SWITCH(__SET_I, arr->hffi_t)
 
-    __SET_I(HFFI_TYPE_FLOAT, float)
-    __SET_I(HFFI_TYPE_DOUBLE, double)
-    __SET_I(HFFI_TYPE_INT, sint32)
+    switch (arr->hffi_t) {   
 
     case HFFI_TYPE_HARRAY_PTR:{
         if(arr->ele_list[index] != NULL){
@@ -415,20 +394,8 @@ int harray_seti2(harray* arr, int index, void* ptr){
     if(index >= arr->ele_count){
         return HFFI_STATE_FAILED;
     }
-    switch (arr->hffi_t) {
-    __SET_I_2(HFFI_TYPE_SINT8, sint8)
-    __SET_I_2(HFFI_TYPE_UINT8, uint8)
-    __SET_I_2(HFFI_TYPE_SINT16, sint16)
-    __SET_I_2(HFFI_TYPE_UINT16, uint16)
-    __SET_I_2(HFFI_TYPE_SINT32, sint32)
-    __SET_I_2(HFFI_TYPE_UINT32, uint32)
-    __SET_I_2(HFFI_TYPE_SINT64, sint64)
-    __SET_I_2(HFFI_TYPE_UINT64, uint64)
-
-    __SET_I_2(HFFI_TYPE_FLOAT, float)
-    __SET_I_2(HFFI_TYPE_DOUBLE, double)
-    __SET_I_2(HFFI_TYPE_INT, int)
-
+    DEF_HFFI_BASE_SWITCH(__SET_I_2, arr->hffi_t)
+    switch (arr->hffi_t) {    
     case HFFI_TYPE_HARRAY_PTR:{
         if(arr->ele_list[index] != NULL){
             harray_delete(((harray*)arr->ele_list[index]));
