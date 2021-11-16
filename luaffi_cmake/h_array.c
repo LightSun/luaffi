@@ -141,7 +141,7 @@ harray* harray_new_from_data(sint8 hffi_t, void* data, int data_size, int ele_co
     case HFFI_TYPE_HARRAY_PTR:
     case HFFI_TYPE_HARRAY:{
         arr->ele_list = MALLOC(sizeof (void*) * ele_count);
-        memset(arr->ele_list, 0 , sizeof (sizeof (void*) * ele_count));
+        memset(arr->ele_list, 0 , sizeof (void*) * ele_count);
     }break;
     default:
         arr->ele_list = NULL;
