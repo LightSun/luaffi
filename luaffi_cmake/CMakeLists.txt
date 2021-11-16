@@ -5,6 +5,7 @@ project(luaffi_app LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+#cmake can build gTest
 SET(gTest_enabled true)
 if(gTest_enabled)
     include_directories(D:/study/github/thirds/googletest-release-1.11.0/googletest/include)
