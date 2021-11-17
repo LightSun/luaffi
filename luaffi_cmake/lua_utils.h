@@ -15,6 +15,7 @@
 typedef hffi_struct* (*Func_get_ptr_struct)(lua_State* L, int idx);
 typedef harray* (*Func_get_ptr_harray)(lua_State* L, int idx);
 typedef hffi_smtype* (*Func_get_ptr_smtype)(lua_State* L, int idx);
+typedef void(*Fun_delete)(void* data);
 
 //build smtypes. return HFFI_STATE_OK if success.
 int build_smtypes(lua_State* L, array_list* sm_list, array_list* sm_names,
@@ -27,5 +28,10 @@ int hlua_get_number(lua_State* L, int idx, const char* key, lua_Number def_val);
 int hlua_get_boolean(lua_State* L, int idx, const char* key, int def_val);
 
 int hlua_rawgeti_int(lua_State* L, int tab_idx, int n);
+
+void hlua_push_light_uservalue(lua_State* L, int tab_idx, void* ud, Fun_delete delete);
+void hlua_share_light_uservalue(lua_State* L, int tab_old, int tab_new);
+void* hlua_get_light_uservalue(lua_State* L, int tab_index);
+void hlua_delete_light_uservalue(lua_State* L, int tab_index);
 
 #endif // LUA_UTIL_H

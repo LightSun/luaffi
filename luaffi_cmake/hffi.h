@@ -230,7 +230,8 @@ int hffi_struct_get_base(hffi_struct* hs, int index, sint8 target_hffi, void* pt
 int hffi_struct_set_base(hffi_struct* hs, int index, sint8 target_hffi, void* ptr);
 hffi_struct* hffi_struct_get_struct(hffi_struct* hs, int index);
 struct harray* hffi_struct_get_harray(hffi_struct* hs, int index);
-
+harray* hffi_struct_get_as_array(hffi_struct* hs, int index, sint8 hffi_t,int rows, int cols,
+                                 int continue_mem, int share_memory);
 //----------------- manager -------------------
 
 hffi_manager* hffi_new_manager();

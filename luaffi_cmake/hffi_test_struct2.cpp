@@ -32,6 +32,7 @@ TEST(testCase,test_struct1){
     ival = 3;
     harray_seti2(arr, 2, &ival);
     harray* arr2 = harray_copy(arr);
+    EXPECT_EQ(harray_eq(arr2, arr), HFFI_STATE_OK);
 
     array_list* list = array_list_new2(6);
     hffi_smtype* t1 = hffi_new_smtype(HFFI_TYPE_SINT16);
@@ -59,8 +60,19 @@ TEST(testCase,test_struct1){
     sint16 ret_hs_val1 = 0;
     EXPECT_EQ(hffi_struct_get_base(hs_ret, 0, 0, &ret_hs_val1), HFFI_STATE_OK);
     EXPECT_EQ(ret_hs_val1, hs_val1);
-    EXPECT_EQ(hffi_struct_get_harray(hs_ret, 1), arr);
-    //TODO EXPECT_EQ(hffi_struct_get_harray(hs_ret, 1), arr);
+    harray* tmp_arr = hffi_struct_get_harray(hs_ret, 2);
+    EXPECT_NE(tmp_arr, nullptr);
+    EXPECT_EQ(tmp_arr->ele_count, 3);
+    //judget element.
+    union harray_ele ele_ret;
+    harray_geti(tmp_arr, 0, &ele_ret);
+    EXPECT_EQ(ele_ret._sint8, 1 * 10);
+    harray_geti(tmp_arr, 1, &ele_ret);
+    EXPECT_EQ(ele_ret._sint8, 2 * 10);
+    harray_geti(tmp_arr, 2, &ele_ret);
+    EXPECT_EQ(ele_ret._sint8, 3 * 10);
+
+    //EXPECT_EQ(harray_eq(tmp_arr, arr2), HFFI_STATE_OK);
 
     hffi_delete_value(ret);
     hffi_delete_value(p1);

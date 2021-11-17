@@ -1,5 +1,13 @@
 
 #include "lua_utils.h"
+#include "h_alloctor.h"
+#include "atomic.h"
+
+struct HDataWrapper{
+    void* data;
+    Fun_delete func;
+    volatile int ref;
+};
 
 int hlua_get_int(lua_State* L, int idx, const char* key, int def_val){
     int t = lua_getfield(L, idx, key);
@@ -38,6 +46,37 @@ int hlua_rawgeti_int(lua_State* L, int tab_idx, int n){
     int v = luaL_checkinteger(L, -1);
     lua_pop(L, 1);
     return v;
+}
+
+void hlua_push_light_uservalue(lua_State* L, int tab_idx, void* ud, Fun_delete delete){
+    struct HDataWrapper* w = MALLOC(sizeof (struct HDataWrapper));
+    w->data = ud;
+    w->func = delete;
+    w->ref = 1;
+    lua_pushlightuserdata(L, w);
+    lua_setuservalue(L, tab_idx);
+}
+void* hlua_get_light_uservalue(lua_State* L, int tab_index){
+    lua_getuservalue(L, tab_index);
+    struct HDataWrapper* w = (struct HDataWrapper*)lua_topointer(L, -1);
+    lua_pop(L, 1);
+    return w->data;
+}
+void hlua_delete_light_uservalue(lua_State* L, int tab_index){
+    lua_getuservalue(L, tab_index);
+    struct HDataWrapper* w = (struct HDataWrapper*)lua_topointer(L, -1);
+    lua_pop(L, 1);
+    if(atomic_add(&w->ref, -1) == 1){
+        w->func(w->data);
+        FREE(w);
+    }
+}
+
+void hlua_share_light_uservalue(lua_State* L, int tab_old, int tab_new){
+    lua_getuservalue(L, tab_old);
+    struct HDataWrapper* w = (struct HDataWrapper*)lua_topointer(L, -1);
+    atomic_add(&w->ref, 1);
+    lua_setuservalue(L, tab_new);
 }
 
 #define CHECK_NEXT_ASPTR()\

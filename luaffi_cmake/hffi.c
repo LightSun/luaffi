@@ -156,7 +156,8 @@ case ffi_t:{\
         return arr;\
     }\
 }break;
-static harray* hffi_get_pointer_as_array_impl(sint8 ffi_t, void* _ptr, int rows, int cols,int continue_mem, int share_memory){
+static harray* hffi_get_pointer_as_array_impl(sint8 ffi_t, void* _ptr, int rows, int cols,
+                                              int continue_mem, int share_memory){
     DEF_HFFI_BASE_SWITCH(DEF_GET_AS_ARRAY_IMPL, ffi_t);
     return NULL;
 }
@@ -886,7 +887,6 @@ static inline hffi_struct* hffi_new_struct_from_list0(int abi,struct array_list*
     //for HFFI_STRUCT_NO_DATA. the data will be malloc by function.
     ptr->parent_pos = parent_pos != HFFI_STRUCT_NO_DATA ? parent_pos : HFFI_STRUCT_NO_PARENT;
     ptr->sub_ffi_types = sub_types;
-    ptr->free_data = 1;
     //handle sub structs' data-pointer.
     __set_children_data(ptr);
     return ptr;
@@ -1234,7 +1234,8 @@ case ffi_t:{\
 }
 
 //type must be the real data type
-harray* hffi_struct_get_as_array(hffi_struct* hs, int index, sint8 type,int rows, int cols, int continue_mem, int share_memory){
+harray* hffi_struct_get_as_array(hffi_struct* hs, int index, sint8 type,int rows, int cols,
+                                 int continue_mem, int share_memory){
     if(index >= hs->count) return NULL;
     if(hs->hffi_types[index] != HFFI_TYPE_POINTER) return NULL;
 

@@ -411,6 +411,10 @@ static int xffi_smtype_new(lua_State* L){
                          "2, smtypes(table). 3, userdata(struct/array) + bool(as ptr or not).");
 }
 //----------------- struct ---------------
+static void __delete_smnames(void* d){
+    array_list* list = d;
+    array_list_delete2(list, string_delete);
+}
 //static inline int get_base_type(const char* name){
 //    const BasePair *lib;
 //    for (lib = _BASE_PAIRS; lib->name; lib++) {
@@ -444,13 +448,25 @@ static int xffi_struct_new(lua_State *L){
         array_list_delete2(sm_names, string_delete);
         return luaL_error(L, "build struct met unsupport data type.");
     }
+    //options
+    int no_data = 0;
+    int abi = FFI_DEFAULT_ABI;
+    if(lua_type(L, 2) == LUA_TTABLE){
+        no_data = hlua_get_boolean(L, 2, "no_data", no_data);
+        abi = hlua_get_int(L, 2, "abi", abi);
+    }
 
     //msg
     char _m[128];
     char* msg[1];
     msg[0] = _m;
     //create struct
-    hffi_struct* _struct = hffi_new_struct_from_list(sm_list, msg);
+    hffi_struct* _struct;
+    if(no_data){
+        _struct = hffi_new_struct_from_list_no_data(abi, sm_list, msg);
+    }else{
+        _struct = hffi_new_struct_from_list2(abi, sm_list, msg);
+    }
     if(_struct == NULL){
         array_list_delete2(sm_list, list_travel_smtype_delete);
         array_list_delete2(sm_names, string_delete);
@@ -458,27 +474,32 @@ static int xffi_struct_new(lua_State *L){
     }
     array_list_delete2(sm_list, list_travel_smtype_delete);
     push_ptr_hffi_struct(L, _struct);
-    lua_pushlightuserdata(L, sm_names);
-    lua_setuservalue(L, -2);
+    hlua_push_light_uservalue(L, -1, sm_names, __delete_smnames);
     return 1;
 }
 static int xffi_struct_gc(lua_State *L){
     hffi_struct* _struct = get_ptr_hffi_struct(L, -1);
-    lua_getuservalue(L, -1);
-    array_list* sm_names = (array_list*)lua_topointer(L, -1);
+    hlua_delete_light_uservalue(L, -1);
     hffi_delete_struct(_struct);
-    array_list_delete2(sm_names, string_delete);
     return 0;
 }
 static int __struct_copy(lua_State *L){
     hffi_struct* hs = get_ptr_hffi_struct(L, lua_upvalueindex(1));
-    return push_ptr_hffi_struct(L, hffi_struct_copy(hs));
+    push_ptr_hffi_struct(L, hffi_struct_copy(hs));
+    hlua_share_light_uservalue(L, lua_upvalueindex(1), -1);
+    return 1;
+}
+static int __struct_get(lua_State *L){
+    hffi_struct* hs = get_ptr_hffi_struct(L, lua_upvalueindex(1));
+    //index, target_ffi, ptr
+    return 1;
 }
 static int xffi_struct_index(lua_State *L){
     //TODO
     if(lua_type(L, 2) == LUA_TSTRING){
         const char* fun_name = lua_tostring(L, 2);
         __INDEX_METHOD("copy", __struct_copy)
+        __INDEX_METHOD("get", __struct_get)
         return luaL_error(L, "unsupport method('%s') for smtype.", fun_name);
     }
     return 0;
