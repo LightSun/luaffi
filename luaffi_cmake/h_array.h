@@ -68,6 +68,8 @@ int harray_geti(harray* arr, int index, union harray_ele* ptr);
 int harray_seti(harray* arr, int index, union harray_ele* ptr);
 int harray_seti2(harray* arr, int index, void* ptr);
 
+int harray_eq(harray* arr, harray* arr2);
+
 void harray_dump(harray* arr, struct hstring* hs);
 
 #endif // H_ARRAY_H

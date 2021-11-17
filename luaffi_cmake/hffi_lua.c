@@ -83,14 +83,8 @@ if(strcmp(fun_name, name) == 0){\
 ---------- dym_lib->dym_func -------
   */
 //-------------- share funcs --------------
-static void smtype_delete(void* d){
-    if(d) hffi_delete_smtype((hffi_smtype*)d);
-}
 static void string_delete(void* d){
     if(d) FREE(d);
-}
-static void value_delete(void* d){
-    if(d) hffi_delete_value((hffi_value*)d);
 }
 //------------------- harray --------------------
 
@@ -446,7 +440,7 @@ static int xffi_struct_new(lua_State *L){
 
     if(build_smtypes(L, sm_list, sm_names, get_ptr_hffi_struct,
                      get_ptr_harray, get_ptr_hffi_smtype) == HFFI_STATE_FAILED){
-        array_list_delete2(sm_list, smtype_delete);
+        array_list_delete2(sm_list, list_travel_smtype_delete);
         array_list_delete2(sm_names, string_delete);
         return luaL_error(L, "build struct met unsupport data type.");
     }
@@ -458,11 +452,11 @@ static int xffi_struct_new(lua_State *L){
     //create struct
     hffi_struct* _struct = hffi_new_struct_from_list(sm_list, msg);
     if(_struct == NULL){
-        array_list_delete2(sm_list, smtype_delete);
+        array_list_delete2(sm_list, list_travel_smtype_delete);
         array_list_delete2(sm_names, string_delete);
         return luaL_error(L, "create struct failed by '%s'", msg[0]);
     }
-    array_list_delete2(sm_list, smtype_delete);
+    array_list_delete2(sm_list, list_travel_smtype_delete);
     push_ptr_hffi_struct(L, _struct);
     lua_pushlightuserdata(L, sm_names);
     lua_setuservalue(L, -2);
@@ -823,7 +817,7 @@ static int xffi_cif(lua_State *L){
         if(val != NULL){
             array_list_add(params, val);
         }else{
-            array_list_delete2(params, value_delete);
+            array_list_delete2(params, list_travel_value_delete);
             hffi_delete_value(ret_val);
             return luaL_error(L, "unsupport cif type. type must be (sint8,hffi_struct,hffi_value)");
         }
@@ -835,7 +829,7 @@ static int xffi_cif(lua_State *L){
     msg[0] = _m;
     hffi_cif* cif = hffi_new_cif(abi, params, ret_val, msg);
     if(cif == NULL){
-        array_list_delete2(params, value_delete);
+        array_list_delete2(params, list_travel_value_delete);
         hffi_delete_value(ret_val);
         return luaL_error(L, "%s", msg);
     }

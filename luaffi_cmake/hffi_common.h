@@ -43,6 +43,10 @@ typedef signed long long sint64;
 typedef unsigned long long uint64;
 #endif
 
+typedef void (*hffi_fn)(void);
+#define HFFI_STRUCT_NO_PARENT -1
+#define HFFI_STRUCT_NO_DATA -2
+
 #define HFFI_STATE_OK 0
 #define HFFI_STATE_FAILED -1
 
@@ -99,5 +103,6 @@ int hffi_struct_get_data_size(struct hffi_struct* c);
 void hffi_struct_ref(struct hffi_struct* c, int ref_count);
 
 struct hffi_struct* hffi_struct_copy(struct hffi_struct* src);
+int hffi_struct_eq(struct hffi_struct* hs1, struct hffi_struct* hs2);
 
 #endif // HFFI_COMMON_H

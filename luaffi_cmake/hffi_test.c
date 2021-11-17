@@ -18,12 +18,13 @@ void hffi_test2(){
     printf("--------- hffi_test2 -------\n");
     int a = 5;
     int b = 10;
-    int* data = malloc(sizeof(void*));
+    int* data = malloc(sizeof(void*) * 2);
     data[0] = 1;
     data[1] = 2;
     void **d = (void**)data;
     d[0] = &a;
     d[1] = &b;
+    printf("raw_ptr = %p,  ptr_0 = %p\n", data, d[0]);
 
     free(data);
 

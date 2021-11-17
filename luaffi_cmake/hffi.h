@@ -79,6 +79,8 @@ typedef struct hffi_manager{
 }hffi_manager;
 
 extern void list_travel_smtype_delete(void* d);
+extern void list_travel_struct_delete(void* d);
+extern void list_travel_value_delete(void* d);
 
 //error_msg can be null
 ffi_type* to_ffi_type(int8_t ffi_t, char** error_msg);
@@ -148,6 +150,8 @@ struct harray* hffi_value_get_harray(hffi_value* val);
 /** only used for pointer.,  continueMemory: sometimes, some memory malloc split for array-array. */
 struct harray* hffi_value_get_pointer_as_array(hffi_value* val, int rows, int cols, int continue_mem, int share_mem);
 
+hffi_struct* hffi_value_get_pointer_as_struct(hffi_value* val, hffi_struct* style, int share_memory);
+
 //--------- for test ----------
 int hffi_value_set_base(hffi_value* val, void* in_ptr);
 
@@ -206,7 +210,7 @@ hffi_struct* hffi_new_struct_abi(int abi,hffi_smtype** member_types, char** msg)
  */
 hffi_struct* hffi_new_struct_from_list2(int abi,struct array_list* member_types, char** msg);
 hffi_struct* hffi_new_struct_from_list(struct array_list* member_types, char** msg);
-
+hffi_struct* hffi_new_struct_from_list_no_data(int abi,struct array_list* member_types, char** msg);
 /**
  * @brief hffi_new_struct_base:create struct by base types. except struct or its' pointer.
  * @param types: the base types. see HFFI_TYPE_<X>
@@ -214,11 +218,16 @@ hffi_struct* hffi_new_struct_from_list(struct array_list* member_types, char** m
  * @return the struct ptr.
  */
 hffi_struct* hffi_new_struct_base(sint8* types, int count);
+hffi_struct* hffi_new_struct_base_abi(int abi,sint8* types, int count);
 
 void hffi_delete_structs(hffi_struct** cs, int count);
 
-//HFFI_STATE_OK for success
-int hffi_struct_get_base(hffi_struct* hs, int index, void* ptr);
+/**
+ * get base value. if base val is simple ptr.you must assign target_hffi.
+ * @return HFFI_STATE_OK for success.
+ */
+int hffi_struct_get_base(hffi_struct* hs, int index, sint8 target_hffi, void* ptr);
+int hffi_struct_set_base(hffi_struct* hs, int index, sint8 target_hffi, void* ptr);
 hffi_struct* hffi_struct_get_struct(hffi_struct* hs, int index);
 struct harray* hffi_struct_get_harray(hffi_struct* hs, int index);
 
