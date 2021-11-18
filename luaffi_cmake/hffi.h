@@ -83,6 +83,7 @@ extern void list_travel_smtype_delete(void* d);
 extern void list_travel_struct_delete(void* d);
 extern void list_travel_value_delete(void* d);
 extern void list_travel_hcif_delete(void* d);
+extern hffi_value* hffi_get_void_value();
 
 //error_msg can be null
 ffi_type* to_ffi_type(int8_t ffi_t, char** error_msg);
@@ -154,7 +155,8 @@ struct harray* hffi_value_get_harray(hffi_value* val);
 struct harray* hffi_value_get_pointer_as_array(hffi_value* val, int rows, int cols, int continue_mem, int share_mem);
 
 hffi_struct* hffi_value_get_pointer_as_struct(hffi_value* val, hffi_struct* style, int share_memory);
-
+//ext: the ext infos for 'int rows, int cols, int continue_mem, int share_mem'.
+int hffi_value_set_any(hffi_value* val, void* val_ptr, int* ext);
 //--------- for test ----------
 int hffi_value_set_base(hffi_value* val, void* in_ptr);
 
@@ -266,6 +268,7 @@ hffi_closure* hffi_new_closure(void (*fun_proxy)(ffi_cif*,void* ret,void** args,
                                struct array_list* in_vals, hffi_value* return_type, void* ud, char** msg);
 void hffi_delete_closure(hffi_closure* c);
 hffi_closure* hffi_closure_copy(hffi_closure* c);
+void hffi_closure_ref(hffi_closure* hc, int c);
 
 //---------------------- cif ------------------------
 hffi_cif* hffi_new_cif(int abi, struct array_list* in_vals, hffi_value* out, char** msg);

@@ -12,6 +12,8 @@
 #define __STR(x) #x
 #endif
 
+#define HLUA_ADJUST_ID(id) (id < 0 ? lua_gettop(L) + id + 1 : id)
+
 typedef hffi_struct* (*Func_get_ptr_struct)(lua_State* L, int idx);
 typedef harray* (*Func_get_ptr_harray)(lua_State* L, int idx);
 typedef hffi_smtype* (*Func_get_ptr_smtype)(lua_State* L, int idx);
@@ -28,6 +30,11 @@ int hlua_get_number(lua_State* L, int idx, const char* key, lua_Number def_val);
 int hlua_get_boolean(lua_State* L, int idx, const char* key, int def_val);
 
 int hlua_rawgeti_int(lua_State* L, int tab_idx, int n);
+
+//get ext info from a table: continue_mem, share_mem, rows, cols
+int hlua_get_ext_info(lua_State* L, int tab_idx, int* infos);
+
+int hlua_get_ref(lua_State* L, int tab_id, const char* key, int t);
 
 void hlua_push_light_uservalue(lua_State* L, int tab_idx, void* ud, Fun_delete delete);
 void hlua_share_light_uservalue(lua_State* L, int tab_old, int tab_new);

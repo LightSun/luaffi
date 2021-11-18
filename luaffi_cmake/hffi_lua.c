@@ -41,6 +41,7 @@ DEF_HFFI_PUSH_GET(hffi_struct)
 DEF_HFFI_PUSH_GET(hffi_cif)
 DEF_HFFI_PUSH_GET(hffi_smtype)
 DEF_HFFI_PUSH_GET(harray)
+DEF_HFFI_PUSH_GET(hffi_closure)
 
 typedef struct BasePair{
     const char* name;
@@ -909,6 +910,163 @@ static int xffi_cif(lua_State *L){
     push_ptr_hffi_cif(L, cif);
     return 1;
 }
+//------------------- closure ----------------------
+#define HLUA_REF_ID_FUNC LUA_REGISTRYINDEX
+#define HLUA_REF_ID_CTX (LUA_REGISTRYINDEX - 1)
+#define HLUA_EXT_LEN 4
+typedef struct FuncContext{
+    lua_State *L;
+    hffi_closure* closure;
+    int ref_ctx;
+    int ref_func;
+    int* ext_infos;
+}FuncContext;
+
+static void __delete_FuncContext(FuncContext* fc){
+    FREE(fc->ext_infos);
+    if(fc->closure){
+        hffi_delete_closure(fc->closure);
+    }
+    if(fc->ref_func != LUA_NOREF){
+        luaL_unref(fc->L, HLUA_REF_ID_FUNC, fc->ref_func);
+    }
+    if(fc->ref_ctx != LUA_NOREF){
+        luaL_unref(fc->L, HLUA_REF_ID_CTX, fc->ref_ctx);
+    }
+    FREE(fc);
+}
+
+void Hffi_lua_func(ffi_cif* cif,void* ret,void** args,void* ud){
+    H_UNSED(cif);
+    H_UNSED(ret);
+    H_UNSED(args);
+    FuncContext* fc = ud;
+    lua_State *L = fc->L;
+    lua_rawgeti(L, HLUA_REF_ID_FUNC, fc->ref_func);
+    lua_rawgeti(L, HLUA_REF_ID_CTX, fc->ref_ctx);
+    lua_newtable(L);
+    int c = array_list_size(fc->closure->in_vals);
+    hffi_value* tmp_val;
+    for(int i = 0 ; i < c ; i ++){
+        tmp_val = (hffi_value*)array_list_get(fc->closure->in_vals, i);
+        hffi_value_set_any(tmp_val, args[i], fc->ext_infos + i * HLUA_EXT_LEN);
+        push_ptr_hffi_value(L, tmp_val);
+        lua_rawseti(L, -2, i + 1);
+    }
+    //lua_push
+    hffi_value_set_any(fc->closure->ret_val, ret, fc->ext_infos + c * HLUA_EXT_LEN);
+    push_ptr_hffi_value(L, fc->closure->ret_val);
+    //ctx, tab(in_vals), ret_val.
+    int ret_call;
+    if((ret_call = lua_pcall(L, 3, 0, 0)) == LUA_OK){
+        return;
+    }
+    switch (ret_call) {
+    case LUA_ERRRUN:{luaL_error(L, "LUA_ERRRUN(runtime) for call lua func from closure.");}break;
+    case LUA_ERRMEM:{luaL_error(L, "LUA_ERRMEM(memory) for call lua func from closure.");}break;
+    case LUA_ERRERR:{luaL_error(L, "LUA_ERRERR for call lua func from closure.");}break;
+    case LUA_ERRGCMM:{luaL_error(L, "LUA_ERRGCMM(__gc) for call lua func from closure.");}break;
+    case LUA_ERRSYNTAX:{luaL_error(L, "LUA_ERRSYNTAX(system) for call lua func from closure.");}break;
+    }
+}
+
+static int xffi_new_closure(lua_State *L){
+/*
+void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
+                               struct array_list* in_vals, hffi_value* return_type, void* ud
+*/
+    //tab, tab_ext, func.
+    //tab: {a,b,c, ret = }
+    //tab_ext: {4,3}
+    luaL_checktype(L, 1, LUA_TTABLE);
+    if(lua_gettop(L) == 3){
+        luaL_checktype(L, 2, LUA_TTABLE);
+        luaL_checktype(L, 3, LUA_TFUNCTION);
+    }else{
+        luaL_checktype(L, 3, LUA_TFUNCTION);
+    }
+
+    int type;
+    int ref_ctx, ref_func = LUA_NOREF;
+    //func
+    ref_func = luaL_ref(L, HLUA_REF_ID_FUNC); // ref func and pop
+    //ctx
+    ref_ctx = hlua_get_ref(L, 1, "ctx", HLUA_REF_ID_CTX);
+
+    //ret
+    type = lua_getfield(L, 1, "ret");
+    hffi_value* val_ret;
+    switch (type) {
+    case LUA_TUSERDATA:{
+        val_ret = get_ptr_hffi_value(L, -1);
+        lua_pushnil(L);
+        lua_setfield(L, 1 ,"ret");
+    }break;
+    case LUA_TNIL:{
+        val_ret = hffi_get_void_value();
+    }break;
+    case LUA_TNUMBER:{
+        val_ret = hffi_new_value_raw_type(luaL_checkinteger(L, -1));
+        lua_pushnil(L);
+        lua_setfield(L, 1 ,"ret");
+    }break;
+    default:
+        return luaL_error(L, "for create closure. ret type must be value/hffi_type");
+    }
+    lua_pop(L, 1);
+
+    FuncContext* fc = MALLOC(sizeof(FuncContext));
+    memset(fc, 0, sizeof (FuncContext));
+    fc->L = L;
+    fc->ref_ctx = ref_ctx;
+    fc->ref_func = ref_func;
+    //tab
+    int c = lua_rawlen(L, 1);
+    int ext_len = 4;
+    fc->ext_infos = MALLOC(sizeof (int) * (ext_len + 1) * c); //with ret
+    array_list* in_vals = array_list_new2(c * 4 / 3 + 1);
+    for(int i = 0 ; i < c ; i ++){
+        lua_rawgeti(L, 1, i + 1);
+        if(luaL_testudata(L, -1, __STR(hffi_value))){
+            array_list_add(in_vals, get_ptr_hffi_value(L, -1));
+            if(lua_rawgeti(L, 2, i + 1) == LUA_TTABLE){ ;//ext member
+                if(hlua_get_ext_info(L, -1, fc->ext_infos + i * ext_len) != 0){
+                    goto failed;
+                }
+            }
+            lua_pop(L, 1);
+        }else{
+            goto failed;
+        }
+        lua_pop(L, 1);
+    }
+    //ret desc
+    if(lua_rawgeti(L, 2, ext_len + 1) == LUA_TTABLE){ ;//ext member
+        if(hlua_get_ext_info(L, -1, fc->ext_infos + ext_len * c) != 0){
+            goto failed;
+        }
+    }
+    lua_pop(L, 1);
+    //closure
+    hffi_closure* clo = hffi_new_closure(Hffi_lua_func, in_vals, val_ret, fc, NULL);
+    hffi_closure_ref(clo, 1);
+    fc->closure = clo;
+    push_ptr_hffi_closure(L, clo);
+    return 1;
+    failed:
+    array_list_delete2(in_vals, NULL);
+    __delete_FuncContext(fc);
+    return 0;
+}
+static int xffi_closure_gc(lua_State* L){
+    hffi_closure* clo = get_ptr_hffi_closure(L, -1);
+    hffi_delete_closure(clo);
+    return 0;
+}
+static const luaL_Reg g_hffi_closure_Methods[] = {
+    {"__gc", xffi_closure_gc},
+    {NULL, NULL}
+};
 //---------------------------- ffi -----------------------
 static int xffi_defines(lua_State *L){
 #define reg_t(name, type)\
@@ -950,6 +1108,7 @@ LUAMOD_API void register_ffi(lua_State *L){
     REG_CLASS(L, hffi_cif);
     REG_CLASS(L, hffi_smtype);
     REG_CLASS(L, harray);
+    REG_CLASS(L, hffi_closure);
 
     lua_newtable(L);
     lua_pushvalue(L, -1);
@@ -964,6 +1123,7 @@ LUAMOD_API void register_ffi(lua_State *L){
     setfield_function(L, "value", xffi_value_new);
     setfield_function(L, "array", xffi_harray_new);
     setfield_function(L, "smtype", xffi_smtype_new);
+    setfield_function(L, "closure", xffi_new_closure);
     lua_pop(L, 1);
 }
 

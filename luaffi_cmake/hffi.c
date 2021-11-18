@@ -46,6 +46,16 @@ case ffi_t:{\
     return hv;\
 }break;
 
+static hffi_value* _val_void = NULL;
+
+hffi_value* hffi_get_void_value(){
+    if(_val_void == NULL){
+        _val_void = hffi_new_value_raw_type(HFFI_TYPE_VOID);
+        hffi_value_ref(_val_void, 1);//keep never release for void.
+    }
+    return _val_void;
+}
+
 typedef struct struct_item{
     int index;      //the index of struct
     sint8 hffi_t;
@@ -486,6 +496,45 @@ case ffi_t:{\
     DEF_HFFI_BASE_SWITCH(DEF_hffi_value_set_base_impl, ffi_t)
     return HFFI_STATE_FAILED;
 }
+int hffi_value_set_any(hffi_value* val, void* val_ptr, int* ext){
+#define DEF_hffi_value_set_any_impl(ffi_t, type)\
+case ffi_t:{\
+    *((type*)val->ptr) = *((type*)val_ptr);\
+    return HFFI_STATE_OK;\
+}break;
+
+#define DEF_hffi_value_set_any_impl2(ffi_t, type)\
+case ffi_t:{\
+    *((type*)val->ptr) = **((type**)val_ptr);\
+    return HFFI_STATE_OK;\
+}break;
+    int ffi_t = val->base_ffi_type;
+    DEF_HFFI_BASE_SWITCH(DEF_hffi_value_set_any_impl, ffi_t)
+    if(ffi_t == HFFI_TYPE_STRUCT){
+       hffi_struct* hstru = hffi_value_get_struct(val);
+       if(hstru == NULL){
+           return HFFI_STATE_FAILED;
+       }
+       //share?
+       if(ext[1]){
+           //should ensure the size match
+           memcpy(hstru->data, *(void**)val_ptr, hstru->data_size);
+       }else{
+           if(hstru->data){
+               FREE(hstru->data);
+           }
+           hstru->data = *(void**)val_ptr;
+       }
+    }
+    if(ffi_t == HFFI_TYPE_HARRAY){
+        //TODO hffi_value_get_harray(val);
+    }
+    if(ffi_t == HFFI_TYPE_POINTER){
+        ffi_t = val->pointer_base_type;
+    }
+    DEF_HFFI_BASE_SWITCH(DEF_hffi_value_set_any_impl2, ffi_t)
+}
+
 ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg){
     if(val->base_ffi_type == HFFI_TYPE_STRUCT){
         return ((hffi_struct*)(val->ptr))->type;
@@ -1437,6 +1486,9 @@ hffi_closure* hffi_closure_copy(hffi_closure* c){
         array_list_add(ptr->in_vals, hffi_value_copy((hffi_value*)array_list_get(c->in_vals, i)));
     }
     return ptr;
+}
+void hffi_closure_ref(hffi_closure* hc, int c){
+    atomic_add(&hc->ref, c);
 }
 //------------------------------------
 //abi: default is 'FFI_DEFAULT_ABI'
