@@ -2,7 +2,7 @@ ffi.defines();
 
 local arr;
 
-arr = ffi.newArray(byte, 3);
+arr = ffi.array(byte, 3);
 arr[0]=1;
 arr[1]=2;
 arr[2]=3;
@@ -10,7 +10,7 @@ print("test array 1: ", tostring(arr));
 assert(#arr == 3)
 
 
-arr = ffi.newArray(int, {4, 5, 6});
+arr = ffi.array(int, {4, 5, 6});
 print("test array 2: ", tostring(arr));
 
 arr[1] = 100

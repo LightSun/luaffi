@@ -157,9 +157,12 @@ static int __find_ptr(void* ud, int size, int idx, void* data){
     }
     return -1;
 }
-dym_func* dym_lib_get_function(dym_lib* lib, const char* func_name){
+dym_func* dym_lib_get_function(dym_lib* lib, const char* func_name, int ref){
     void* data = array_list_find(lib->func_list, __find_ptr, (void*)func_name);
     if(data != NULL){
+        if(ref){
+            atomic_add(&lib->total_func_ref, 1);
+        }
         return (dym_func*)data;
     }
 
@@ -171,7 +174,9 @@ dym_func* dym_lib_get_function(dym_lib* lib, const char* func_name){
     func->name = strdup(func_name);
     func->func_ptr = sym;
     func->lib = lib;
-    atomic_add(&lib->total_func_ref, 1);
+    if(ref){
+        atomic_add(&lib->total_func_ref, 1);
+    }
     return func;
 }
 

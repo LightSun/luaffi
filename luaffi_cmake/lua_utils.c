@@ -57,7 +57,9 @@ void hlua_push_light_uservalue(lua_State* L, int tab_idx, void* ud, Fun_delete d
     lua_setuservalue(L, tab_idx);
 }
 void* hlua_get_light_uservalue(lua_State* L, int tab_index){
-    lua_getuservalue(L, tab_index);
+    if(lua_getuservalue(L, tab_index) == LUA_TNIL){
+        return NULL;
+    }
     struct HDataWrapper* w = (struct HDataWrapper*)lua_topointer(L, -1);
     lua_pop(L, 1);
     return w->data;

@@ -39,7 +39,8 @@ typedef struct hffi_smtype{
 typedef struct hffi_struct{
     void* data;         // the data of struct, may be shared by parent struct.
     ffi_type * type;    // struct base info. all types with offsets.
-    sint16 parent_pos;  // the parent position if need. or -1 for no parent struct.
+    sint16 parent_pos;  // the parent position if need. or HFFI_STRUCT_NO_PARENT for no parent struct.
+                        // HFFI_STRUCT_NO_DATA for malloc data by others.
     sint8* hffi_types;  // the member base types, latter used to get value.
     int data_size;
     int count;          // member count
@@ -50,10 +51,10 @@ typedef struct hffi_struct{
 
 typedef struct hffi_closure{
     ffi_closure* closure;
-    void** code;             // function ptr ptr
-    hffi_value** val_params;
-    hffi_value* val_return;
-    int volatile ref;        // ref count
+    void* func_ptr;             // function ptr
+    struct array_list* in_vals;
+    hffi_value* ret_val;
+    int volatile ref;           // ref count
 }hffi_closure;
 
 typedef struct hffi_cif{
@@ -61,7 +62,7 @@ typedef struct hffi_cif{
     struct array_list* in_vals; //element is hffi_value*
     hffi_value* out;
     void **args;
-    int volatile ref;        // ref count
+    int volatile ref;           //ref count
 }hffi_cif;
 
 typedef struct hffi_manager{
@@ -81,6 +82,7 @@ typedef struct hffi_manager{
 extern void list_travel_smtype_delete(void* d);
 extern void list_travel_struct_delete(void* d);
 extern void list_travel_value_delete(void* d);
+extern void list_travel_hcif_delete(void* d);
 
 //error_msg can be null
 ffi_type* to_ffi_type(int8_t ffi_t, char** error_msg);
@@ -135,6 +137,7 @@ hffi_value* hffi_new_value_struct_ptr(hffi_struct* c);
 
 hffi_value* hffi_new_value_harray(struct harray* arr);
 hffi_value* hffi_new_value_harray_ptr(struct harray* arr);
+hffi_value* hffi_new_value_closure(hffi_closure* closure);
 
 hffi_value* hffi_value_copy(hffi_value* val);
 
@@ -222,6 +225,7 @@ hffi_struct* hffi_new_struct_base_abi(int abi,sint8* types, int count);
 
 void hffi_delete_structs(hffi_struct** cs, int count);
 
+int hffi_struct_is_pointer(hffi_struct* hs, int index);
 /**
  * get base value. if base val is simple ptr.you must assign target_hffi.
  * @return HFFI_STATE_OK for success.
@@ -230,7 +234,7 @@ int hffi_struct_get_base(hffi_struct* hs, int index, sint8 target_hffi, void* pt
 int hffi_struct_set_base(hffi_struct* hs, int index, sint8 target_hffi, void* ptr);
 hffi_struct* hffi_struct_get_struct(hffi_struct* hs, int index);
 struct harray* hffi_struct_get_harray(hffi_struct* hs, int index);
-harray* hffi_struct_get_as_array(hffi_struct* hs, int index, sint8 hffi_t,int rows, int cols,
+struct harray* hffi_struct_get_as_array(hffi_struct* hs, int index, sint8 hffi_t,int rows, int cols,
                                  int continue_mem, int share_memory);
 //----------------- manager -------------------
 
@@ -251,7 +255,6 @@ void* hffi_manager_alloc(hffi_manager*, int size);
 //------------------- closure --------------
 /**
  * @brief hffi_new_closure: create closure with concat function proxy.
- * @param codeloc  often is the function-ptr
  * @param fun_proxy  the function proxy as function-ptr
  * @param param_types the parameter values. must end with null.
  * @param return_type the return type
@@ -259,13 +262,15 @@ void* hffi_manager_alloc(hffi_manager*, int size);
  * @param msg the output error msg. can be null.
  * @return the struct of closure. or null if failed.
  */
-hffi_closure* hffi_new_closure(void* codeloc, void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
-                               hffi_value** param_types, hffi_value* return_type, void* ud, char** msg);
+hffi_closure* hffi_new_closure(void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
+                               struct array_list* in_vals, hffi_value* return_type, void* ud, char** msg);
 void hffi_delete_closure(hffi_closure* c);
+hffi_closure* hffi_closure_copy(hffi_closure* c);
 
 //---------------------- cif ------------------------
 hffi_cif* hffi_new_cif(int abi, struct array_list* in_vals, hffi_value* out, char** msg);
 void hffi_delete_cif(hffi_cif* hcif);
+void hffi_cif_ref(hffi_cif* hcif, int c);
 void hffi_cif_call(hffi_cif* hcif, void* fun);
 hffi_value* hffi_cif_get_result_value(hffi_cif* hcif);
 hffi_value* hffi_cif_get_param_value(hffi_cif* hcif, int index);

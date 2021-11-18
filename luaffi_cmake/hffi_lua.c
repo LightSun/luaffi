@@ -491,11 +491,63 @@ static int __struct_copy(lua_State *L){
 }
 static int __struct_get(lua_State *L){
     hffi_struct* hs = get_ptr_hffi_struct(L, lua_upvalueindex(1));
+    if(hs->data == NULL){
+        return 0;
+    }
     //index, target_ffi, ptr
-    return 1;
+    //multi level ptr
+    if(hs->parent_pos == HFFI_STRUCT_NO_DATA){
+        //int rows, int cols, int continue_mem, int share_mem
+        luaL_checktype(L, 1, LUA_TTABLE);
+        int continue_mem = 1;
+        int share_mem = 1;
+        int index = 0;
+        sint8 hffi_t = HFFI_TYPE_SINT8;
+        continue_mem = hlua_get_boolean(L, 1, "continue_mem", continue_mem);
+        share_mem = hlua_get_boolean(L, 1, "share_mem", share_mem);
+        index = hlua_get_int(L, 1, "index", index);
+        hffi_t = (sint8)hlua_get_int(L, 1, "type", hffi_t);
+
+        if(lua_rawlen(L, 1) == 0) return 0;
+        int rows = hlua_rawgeti_int(L, 1, 1);
+        int cols = 0;
+        if(lua_rawlen(L, 1) >= 2){
+            cols = hlua_rawgeti_int(L, 1, 2);
+        }
+        harray* arr = hffi_struct_get_as_array(hs, index, hffi_t, rows, cols, continue_mem, share_mem);
+        return push_ptr_harray(L, arr);
+    }
+    //index
+    int index = luaL_checkinteger(L, 1);
+    hffi_struct* hstr = hffi_struct_get_struct(hs, index);
+    if(hstr != NULL){
+         hffi_struct_ref(hstr, 1);
+         return push_ptr_hffi_struct(L, hstr);
+    }
+    harray* arr = hffi_struct_get_harray(hs, index);
+    if(hstr != NULL){
+         harray_ref(arr, 1);
+         return push_ptr_harray(L, arr);
+    }
+    //target element type.
+    int ffi_t = HFFI_TYPE_SINT8;
+    if(hffi_struct_is_pointer(hs, index)){
+        ffi_t = luaL_checkinteger(L, 2);
+    }
+    if(ffi_t == HFFI_TYPE_FLOAT || ffi_t == HFFI_TYPE_DOUBLE){
+        lua_Number num;
+        hffi_struct_get_base(hs, index, ffi_t, &num);
+        lua_pushnumber(L, num);
+        return 1;
+    }else{
+        lua_Integer num;
+        hffi_struct_get_base(hs, index, ffi_t, &num);
+        lua_pushinteger(L, num);
+        return 1;
+    }
+    return 0;
 }
 static int xffi_struct_index(lua_State *L){
-    //TODO
     if(lua_type(L, 2) == LUA_TSTRING){
         const char* fun_name = lua_tostring(L, 2);
         __INDEX_METHOD("copy", __struct_copy)
@@ -596,7 +648,7 @@ static int xffi_value_gc(lua_State *L){
     hffi_delete_value(val);
     return 0;
 }
-static int xffi_value_get(lua_State *L){
+static int __hiff_value_get(lua_State *L){
     hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
     if(val->base_ffi_type == HFFI_TYPE_VOID){
         return 0;
@@ -648,7 +700,7 @@ static int xffi_value_get(lua_State *L){
     }
     return 0;
 }
-static int xffi_value_copy(lua_State *L){
+static int __hiff_value_copy(lua_State *L){
     hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
     return push_ptr_hffi_value(L, hffi_value_copy(val));
 }
@@ -657,12 +709,12 @@ static int xffi_value_index(lua_State *L){
         const char* fun_name = lua_tostring(L, 2);
         if(strcmp(fun_name, "copy") == 0){
             lua_pushvalue(L, 1);
-            lua_pushcclosure(L, xffi_value_copy, 1);
+            lua_pushcclosure(L, __hiff_value_copy, 1);
             return 1;
         }
         if(strcmp(fun_name, "get") == 0){
             lua_pushvalue(L, 1);
-            lua_pushcclosure(L, xffi_value_get, 1);
+            lua_pushcclosure(L, __hiff_value_get, 1);
             return 1;
         }
     }
@@ -677,6 +729,7 @@ static const luaL_Reg g_hffi_value_Methods[] = {
 //------------------- dym_func ------------
 static int xffi_dym_func_gc(lua_State *L){
     dym_func* func = get_ptr_dym_func(L, -1);
+    hlua_delete_light_uservalue(L, -1);
     dym_delete_func(func);
     return 0;
 }
@@ -696,47 +749,40 @@ case ft:{\
     return 1;\
 }break;
 
-static int xffi_dym_func_call(lua_State *L){
-    //func, cif
-    dym_func* func = get_ptr_dym_func(L, 1);
+static int __dym_func_bind(lua_State *L){
+    int func_index = lua_upvalueindex(1);
     hffi_cif* cif = get_ptr_hffi_cif(L, -1);
-    hffi_cif_call(cif, func->func_ptr);
-    hffi_struct* stru = hffi_value_get_struct(cif->out);
-    if(stru != NULL){
-        hffi_struct_ref(stru, 1);
-        push_ptr_hffi_struct(L, stru);
-        return 1;
-    }
-    //cast to lua
-    switch (cif->out->base_ffi_type) {
-    case HFFI_TYPE_VOID:{return 0;}break;
-//    case HFFI_TYPE_SINT8:{
-//        sint8 val;
-//        hffi_value_get_sint8(cif->out, &val);
-//        lua_pushinteger(L, val);
-//        return 1;
-//    }break;
-VAL_TO_LUA_RESULT(HFFI_TYPE_SINT8, sint8)
-VAL_TO_LUA_RESULT(HFFI_TYPE_UINT8, uint8)
-VAL_TO_LUA_RESULT(HFFI_TYPE_SINT16, sint16)
-VAL_TO_LUA_RESULT(HFFI_TYPE_UINT16, uint16)
-VAL_TO_LUA_RESULT(HFFI_TYPE_SINT32, sint32)
-VAL_TO_LUA_RESULT(HFFI_TYPE_INT, sint32)
-VAL_TO_LUA_RESULT(HFFI_TYPE_UINT32, uint32)
-VAL_TO_LUA_RESULT(HFFI_TYPE_SINT64, sint64)
-VAL_TO_LUA_RESULT(HFFI_TYPE_UINT64, uint64)
+    hffi_cif_ref(cif, 1);
+    hlua_push_light_uservalue(L, func_index, cif, list_travel_hcif_delete);
+    lua_pushvalue(L, func_index);
+    return 1;
+}
 
-VAL_TO_LUA_RESULT_F(HFFI_TYPE_FLOAT, float)
-VAL_TO_LUA_RESULT_F(HFFI_TYPE_DOUBLE, double)
+static int __dym_func_call(lua_State *L){
+    //func, cif
+    int func_index = lua_upvalueindex(1);
+    dym_func* func = get_ptr_dym_func(L, func_index);
+    hffi_cif* cif = (hffi_cif*)hlua_get_light_uservalue(L, func_index);
+    if(cif == NULL){
+        cif = get_ptr_hffi_cif(L, -1);
     }
-    //default push value
+    hffi_cif_call(cif, func->func_ptr);
+
     hffi_value_ref(cif->out, 1);
     push_ptr_hffi_value(L, cif->out);
     return 1;
 }
+int xffi_dym_func_index(lua_State* L){
+    if(lua_type(L, 2) == LUA_TSTRING){
+        const char* fun_name = lua_tostring(L, 2);
+        __INDEX_METHOD("call", __dym_func_call)
+        __INDEX_METHOD("bind", __dym_func_bind)
+        return luaL_error(L, "unsupport method('%s') for smtype.", fun_name);
+    }
+}
 static const luaL_Reg g_dym_func_Methods[] = {
     {"__gc", xffi_dym_func_gc},
-    {"call", xffi_dym_func_call},
+    {"__index", xffi_dym_func_index},
     {NULL, NULL}
 };
 //------------------ dym_lib ----------------------------
@@ -749,12 +795,11 @@ static int xffi_dym_lib_gc(lua_State *L){
 static int xffi_dym_lib_index(lua_State *L){
     // lib , name
     dym_lib* lib = get_ptr_dym_lib(L, 1);
-    dym_func* func = dym_lib_get_function(lib, luaL_checkstring(L, 2));
+    dym_func* func = dym_lib_get_function(lib, luaL_checkstring(L, 2), 1);
     if(func == NULL){
         lua_getuservalue(L, 1);
         return luaL_error(L, "can't find function(%s) for lib(%s)", lua_tostring(L, 2), lua_tostring(L, -1));
     }
-    dym_func_ref(func, 1);
     push_ptr_dym_func(L, func);
     return 1;
 }
@@ -773,7 +818,7 @@ static const luaL_Reg g_dym_lib_Methods[] = {
 
 static int xffi_dym_lib_new(lua_State *L){
     luaL_checktype(L, -1, LUA_TSTRING);
-    dym_lib* lib = dym_new_lib(lua_tostring(L, -1));
+    dym_lib* lib = dym_new_lib(luaL_checkstring(L, -1));
     push_ptr_dym_lib(L, lib);
     lua_pushvalue(L, -2);      // str, lib, str
     lua_setuservalue(L, -2);   // str, lib
@@ -794,7 +839,7 @@ static const luaL_Reg g_hffi_cif_Methods[] = {
 
 static inline hffi_value* __get_value(lua_State *L, int idx){
     if(lua_type(L, idx) == LUA_TNUMBER){
-        return hffi_new_value_raw_type(lua_tointeger(L, idx));
+        return hffi_new_value_raw_type(luaL_checkinteger(L, idx));
     }else if(luaL_testudata(L, idx, __STR(hffi_struct)) != 0){
         hffi_struct* _struct = get_ptr_hffi_struct(L, idx);
         return hffi_new_value_struct(_struct);
@@ -803,7 +848,12 @@ static inline hffi_value* __get_value(lua_State *L, int idx){
         hffi_value* val = get_ptr_hffi_value(L, idx);
         hffi_value_ref(val, 1);
         return val;
-    }else{
+    }else if(luaL_testudata(L, idx, __STR(harray)) != 0){
+        harray* val = get_ptr_harray(L, idx);
+        //for support harray ptr. must create hffi_value
+        return hffi_new_value_harray(val);
+    }
+    else{
         return NULL;
     }
 }
@@ -814,9 +864,7 @@ static int xffi_cif(lua_State *L){
     int len = lua_rawlen(L, 1);
     //abi
     int abi = FFI_DEFAULT_ABI;
-    if(lua_getfield(L, 1, "abi") != LUA_TNIL){
-        abi = lua_tointeger(L, -1);
-    }
+    abi = hlua_get_int(L, 1, "abi", abi);
     //ret
     hffi_value* ret_val;
     if(lua_getfield(L, 1, "ret") != LUA_TNIL){
@@ -824,10 +872,12 @@ static int xffi_cif(lua_State *L){
         if(ret_val == NULL){
              return luaL_error(L, "unsupport cif type. type must be (sint8,hffi_struct,hffi_value)");
         }
+        lua_pushnil(L);
+        lua_setfield(L, 1, "ret");
     }else{
         ret_val = hffi_new_value_raw_type(HFFI_TYPE_VOID);
     }
-    lua_pop(L, 2);//pop abi and ret.
+    lua_pop(L, 1);//pop ret.
     //params
     hffi_value* val;
     array_list* params = array_list_new(12, 0.75f);
@@ -854,6 +904,8 @@ static int xffi_cif(lua_State *L){
         hffi_delete_value(ret_val);
         return luaL_error(L, "%s", msg);
     }
+    //de-ref
+    hffi_delete_value(ret_val);
     push_ptr_hffi_cif(L, cif);
     return 1;
 }
@@ -907,11 +959,11 @@ LUAMOD_API void register_ffi(lua_State *L){
     setfield_function(L, "undefines", xffi_undefines);
 
     setfield_function(L, "loadLib", xffi_dym_lib_new);
-    setfield_function(L, "struct", xffi_struct_new);   
+    setfield_function(L, "struct", xffi_struct_new);
     setfield_function(L, "cif", xffi_cif);
-    setfield_function(L, "newValue", xffi_value_new);
-    setfield_function(L, "newArray", xffi_harray_new);
-    setfield_function(L, "newSmtype", xffi_smtype_new);
+    setfield_function(L, "value", xffi_value_new);
+    setfield_function(L, "array", xffi_harray_new);
+    setfield_function(L, "smtype", xffi_smtype_new);
     lua_pop(L, 1);
 }
 

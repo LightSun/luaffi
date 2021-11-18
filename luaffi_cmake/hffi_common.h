@@ -69,6 +69,7 @@ typedef void (*hffi_fn)(void);
 #define HFFI_TYPE_HARRAY (FFI_TYPE_LAST + 2)
 #define HFFI_TYPE_HARRAY_PTR (FFI_TYPE_LAST + 3)
 #define HFFI_TYPE_STRUCT_PTR (FFI_TYPE_LAST + 4)
+#define HFFI_TYPE_CLOSURE (FFI_TYPE_LAST + 5)
 
 #define H_UNSED(x) (void)x;
 #define H_UNSED2(x,y) H_UNSED(x) H_UNSED(y)

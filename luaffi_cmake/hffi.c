@@ -56,7 +56,7 @@ typedef struct struct_item{
 #define _ITEM_COPY_DATA 1    // need copy struct data
 #define _ITEM_SET_DATA_PTR 0 // need set data ptr from parent
 
-int __struct_item_eq(struct_item* i1, struct_item* i2){
+static int __struct_item_eq(struct_item* i1, struct_item* i2){
     if(i1->index != i2->index) return HFFI_STATE_FAILED;
     if(i1->hffi_t != i2->hffi_t) return HFFI_STATE_FAILED;
     if(i1->hffi_t == HFFI_TYPE_POINTER){
@@ -353,6 +353,16 @@ hffi_value* hffi_new_value_harray_ptr(harray* c){
     atomic_add(&c->ref, 1);
     return val_ptr;
 }
+hffi_value* hffi_new_value_closure(hffi_closure* c){
+    hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
+    memset(val_ptr, 0, sizeof (hffi_value));
+    val_ptr->ptr = c;
+    val_ptr->base_ffi_type = HFFI_TYPE_POINTER;
+    val_ptr->pointer_base_type = HFFI_TYPE_CLOSURE;
+    val_ptr->ref = 1;
+    atomic_add(&c->ref, 1);
+    return val_ptr;
+}
 hffi_value* hffi_new_value_harray(struct harray* arr){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     val_ptr->sub_types = array_list_new2(4);
@@ -386,8 +396,20 @@ hffi_value* hffi_value_copy(hffi_value* val){
             val_ptr->ptr = harray_copy((harray*)val->ptr);
         }else if(val->pointer_base_type == HFFI_TYPE_STRUCT){
             val_ptr->ptr = hffi_struct_copy((hffi_struct*)val->ptr);
+        }else if(val->pointer_base_type == HFFI_TYPE_CLOSURE){
+            val_ptr->ptr = hffi_closure_copy((hffi_closure*)val->ptr);
+        }else{
+            if(val->ptr != NULL){
+                val_ptr->ptr = MALLOC(sizeof (void*));
+                memcpy(val_ptr->ptr, val->ptr, sizeof (void*));
+            }
         }
     }break;
+    default:
+        if(val->ptr != NULL){
+            val_ptr->ptr = MALLOC(sizeof (void*));
+            memcpy(val_ptr->ptr, val->ptr, sizeof (void*));
+        }
     }
     return val_ptr;
 }
@@ -513,7 +535,10 @@ static inline void* __get_data_ptr(hffi_value* v){
             return &((hffi_struct*)(v->ptr))->data;
         }else if(v->pointer_base_type == HFFI_TYPE_HARRAY){
             return &((harray*)(v->ptr))->data;
-        }else{
+        }else if(v->pointer_base_type == HFFI_TYPE_CLOSURE){
+            return ((hffi_closure*)(v->ptr))->func_ptr;
+        }
+        else{
             return &v->ptr;
         }
     }break;
@@ -655,6 +680,10 @@ void list_travel_value_delete(void* d){
         hffi_delete_value((hffi_value*)d);
     }
 }
+void list_travel_hcif_delete(void* d){
+    if(d) hffi_delete_cif((hffi_cif*)d);
+}
+
 void hffi_delete_smtype(hffi_smtype* type){
     int old = atomic_add(&type->ref, -1);
     if(old == 1){
@@ -885,7 +914,7 @@ static inline hffi_struct* hffi_new_struct_from_list0(int abi,struct array_list*
     ptr->children = children;
     ptr->ref = 1;
     //for HFFI_STRUCT_NO_DATA. the data will be malloc by function.
-    ptr->parent_pos = parent_pos != HFFI_STRUCT_NO_DATA ? parent_pos : HFFI_STRUCT_NO_PARENT;
+    ptr->parent_pos = parent_pos;
     ptr->sub_ffi_types = sub_types;
     //handle sub structs' data-pointer.
     __set_children_data(ptr);
@@ -1125,6 +1154,9 @@ void hffi_delete_struct(hffi_struct* val){
         FREE(val);
     }
 }
+int hffi_struct_is_pointer(hffi_struct* hs, int index){
+    return hs->hffi_types[index] == HFFI_TYPE_POINTER;
+}
 void hffi_struct_ref(hffi_struct* c, int ref_count){
     atomic_add(&c->ref, ref_count);
 }
@@ -1298,87 +1330,113 @@ void* hffi_manager_alloc(hffi_manager* hm,int size){
 }
 
 //------------------------- closure impl ---------------------------------
-hffi_closure* hffi_new_closure(void* func_ptr, void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
-                               hffi_value** val_params, hffi_value* val_return, void* ud, char** msg){
-    hffi_get_pointer_count(in_count, val_params);
+hffi_closure* hffi_new_closure(void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
+                               struct array_list* in_vals, hffi_value* val_return, void* ud, char** msg){
+#define DEF_CLOSURE_VALS_REF(c)\
+{hffi_value* tmp_val;\
+for(int i = 0 ; i < in_count ; i ++){\
+    tmp_val = array_list_get(in_vals, i);\
+    atomic_add(&tmp_val->ref, c);\
+}\
+atomic_add(&val_return->ref, c);}
+
+    int in_count = array_list_size(in_vals);
+    //mark reference
+    DEF_CLOSURE_VALS_REF(1);
+
     hffi_closure* ptr = MALLOC(sizeof(hffi_closure));
     memset(ptr, 0, sizeof(hffi_closure));
     ptr->ref = 1;
-    ptr->code = &func_ptr;
-    ptr->val_params = val_params;
-    ptr->val_return = val_return;
-    //mark reference
-    for(int i = 0 ; i < in_count ; i ++){
-        atomic_add(&val_params[i]->ref, 1);
-    }
-    atomic_add(&val_return->ref, 1);
+    ptr->in_vals = in_vals;
+    ptr->ret_val = val_return;
 
     //create closure, prepare
-    ptr->closure = ffi_closure_alloc(sizeof(ffi_closure), &func_ptr);
+    ptr->closure = ffi_closure_alloc(sizeof(ffi_closure) + sizeof (int), &ptr->func_ptr);
     if(ptr->closure == NULL){
-        hffi_delete_closure(ptr);
         if(msg){
             strcpy(*msg, "create closure failed!");
         }
-        return NULL;
+        goto failed;
     }
+    int* ref_ptr = (void*)ptr->closure + sizeof(ffi_closure);
+    *ref_ptr = 1;
 
     //param
     ffi_type ** argTypes = NULL;
     if(in_count > 0){
         argTypes = alloca(sizeof(ffi_type *) *in_count);
         for(int i = 0 ; i < in_count ; i ++){
-            argTypes[i] = hffi_value_get_rawtype(val_params[i], msg);
+            argTypes[i] = hffi_value_get_rawtype((hffi_value*)array_list_get(in_vals, i), msg);
             if(argTypes[i] == NULL){
-                hffi_delete_closure(ptr);
-                return NULL;
+                goto failed;
             }
         }
     }
     //return type
     ffi_type *return_type = hffi_value_get_rawtype(val_return, msg);
     if(return_type == NULL){
-        hffi_delete_closure(ptr);
-        return NULL;
+        goto failed;
     }
     //prepare
     ffi_cif cif;
     if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, in_count, return_type, argTypes) == FFI_OK) {
         //concat closure with proxy.
-        if (ffi_prep_closure_loc(ptr->closure, &cif, fun_proxy, ud, func_ptr) == FFI_OK) {
+        if (ffi_prep_closure_loc(ptr->closure, &cif, fun_proxy, ud, ptr->func_ptr) == FFI_OK) {
             return ptr; //now we can call func
         }else{
-            hffi_delete_closure(ptr);
             if(msg){
                 strcpy(*msg, "concat closure with function proxy failed!");
             }
+            goto failed;
         }
     }else{
-        hffi_delete_closure(ptr);
         if(msg){
             strcpy(*msg, "ffi_prep_cif(...) failed!");
         }
+        goto failed;
     }
+    failed:
+    hffi_delete_closure(ptr);
+    hffi_value* val;
+    for(int i = 0 ; i < in_count ; i ++){
+        val = array_list_get(in_vals, i);
+        hffi_delete_value(val);
+    }
+    hffi_delete_value(val_return);
     return NULL;
 }
 void hffi_delete_closure(hffi_closure* val){
     int old = atomic_add(&val->ref, -1);
     if(old == 1){
-        if(val->closure){
-            ffi_closure_free(val->closure);
+        volatile int* ref_ptr = (void*)val->closure + sizeof(ffi_closure);
+        if(atomic_add(ref_ptr, -1) == 1){
+             ffi_closure_free(val->closure);
         }
-        if(val->val_params){
-            int n = 0;
-            while(val->val_params[n] != NULL){
-                hffi_delete_value(val->val_params[n]);
-                n++;
-            }
+        if(val->in_vals){
+            array_list_delete2(val->in_vals, list_travel_value_delete);
         }
-        if(val->val_return){
-            hffi_delete_value(val->val_return);
+        if(val->ret_val){
+            hffi_delete_value(val->ret_val);
         }
         FREE(val);
     }
+}
+hffi_closure* hffi_closure_copy(hffi_closure* c){
+    //add ref
+    volatile int* ref_ptr = (void*)c->closure + sizeof(ffi_closure);
+    atomic_add(ref_ptr, 1);
+    //
+    hffi_closure* ptr = MALLOC(sizeof(hffi_closure));
+    ptr->ref = 1;
+    ptr->in_vals = array_list_new2(array_list_size(c->in_vals) * 4 / 3 + 1);
+    ptr->ret_val = hffi_value_copy(c->ret_val);
+    ptr->closure = c->closure;
+    ptr->func_ptr = c->func_ptr;
+    int count = array_list_size(c->in_vals);
+    for(int i = 0 ; i < count ; i ++){
+        array_list_add(ptr->in_vals, hffi_value_copy((hffi_value*)array_list_get(c->in_vals, i)));
+    }
+    return ptr;
 }
 //------------------------------------
 //abi: default is 'FFI_DEFAULT_ABI'
@@ -1448,6 +1506,9 @@ hffi_cif* hffi_new_cif(int abi,array_list* in_vals, hffi_value* out, char** msg)
     hffi_delete_value(out);
     FREE(args);
     return NULL;
+}
+void hffi_cif_ref(hffi_cif* hcif, int c){
+    atomic_add(&hcif->ref, c);
 }
 void hffi_delete_cif(hffi_cif* hcif){
     if(atomic_add(&hcif->ref, -1) == 1){

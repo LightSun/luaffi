@@ -26,7 +26,7 @@ typedef struct dym_func{
 
 dym_lib* dym_new_lib(const char* libname);
 void dym_delete_lib(dym_lib* lib);
-dym_func* dym_lib_get_function(dym_lib* lib, const char* func_name);
+dym_func* dym_lib_get_function(dym_lib* lib, const char* func_name, int ref);
 void dym_delete_func(dym_func* func);
 void dym_delete_func_by_name(dym_lib* lib, const char* name);
 
