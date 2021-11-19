@@ -12,6 +12,7 @@ void testCall();
 void testCall2();
 void testClosure();
 void testClosure2();
+void testClosure3();
 
 void hffi_test1();
 void hffi_test2();
@@ -52,6 +53,8 @@ static void test_ffi_all(){
     testCall2();
     testClosure();
     testClosure2();
+    testClosure3();
+
     hffi_test1();
     hffi_test2();
     hffi_test_struct();

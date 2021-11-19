@@ -2,6 +2,10 @@
 #define H_FFI_H
 #include "hffi_common.h"
 
+// offsets = (size_t *) &type->elements[c+1];
+#define HFFI_OFFSETS(type, c)  (size_t *)&type->elements[c+1]
+#define HFFI_STRUCT_TYPE_SIZE(c) (sizeof (ffi_type) + sizeof (ffi_type*) * (c + 1) + sizeof (size_t) * c)
+
 #define hffi_new_value_auto_x_def(type) \
 hffi_value* hffi_new_value_##type(type val);
 
@@ -13,6 +17,7 @@ int n = 0;\
 while(p[n] != NULL){\
     n++;\
 }
+
 struct linklist_node;
 struct array_list;
 struct harray;
@@ -41,6 +46,7 @@ typedef struct hffi_struct{
     ffi_type * type;    // struct base info. all types with offsets.
     sint16 parent_pos;  // the parent position if need. or HFFI_STRUCT_NO_PARENT for no parent struct.
                         // HFFI_STRUCT_NO_DATA for malloc data by others.
+    sint8 abi;          // which used to create
     sint8* hffi_types;  // the member base types, latter used to get value.
     int data_size;
     int count;          // member count
@@ -267,7 +273,7 @@ void* hffi_manager_alloc(hffi_manager*, int size);
  */
 hffi_closure* hffi_new_closure(void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
                                struct array_list* in_vals, hffi_value* return_type, void* ud, char** msg);
-void hffi_delete_closure(hffi_closure* c);
+int hffi_delete_closure(hffi_closure* c);
 hffi_closure* hffi_closure_copy(hffi_closure* c);
 void hffi_closure_ref(hffi_closure* hc, int c);
 

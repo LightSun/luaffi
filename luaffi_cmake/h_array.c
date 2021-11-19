@@ -569,9 +569,15 @@ void harray_dump(harray* arr, struct hstring* hs){
     case HFFI_TYPE_HARRAY_PTR:{
         union harray_ele ele;
         for(int i = 0 ; i < arr->ele_count ; i ++){
-            harray_seti(arr, i, &ele);
-            if(i != 0){hstring_append(hs, ", ");}
-            harray_dump(ele._extra, hs);
+            harray_geti(arr, i, &ele);
+            if(i != 0){
+                hstring_append(hs, ", ");
+            }
+            if(ele._extra != NULL){
+                harray_dump(ele._extra, hs);
+            }else{
+                hstring_append(hs, "null");
+            }
         }
     }break;
     //TODO latter support struct

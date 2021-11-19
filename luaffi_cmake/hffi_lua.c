@@ -922,11 +922,9 @@ typedef struct FuncContext{
     hffi_closure* closure;
     int ref_ctx;
     int ref_func;
-    int* ext_infos;
 }FuncContext;
 
 static void __delete_FuncContext(FuncContext* fc){
-    FREE(fc->ext_infos);
     if(fc->closure){
         hffi_delete_closure(fc->closure);
     }
@@ -972,9 +970,6 @@ void Hffi_lua_func(ffi_cif* cif,void* ret,void** args,void* ud){
             }
         }break;
 
-        case LUA_TSTRING:{
-            //char array?
-        }break;
         case LUA_TUSERDATA:{
             if(luaL_testudata(L, -1, __STR(hffi_value))){
                 hffi_value* hs = get_ptr_hffi_value(L, -1);
@@ -986,10 +981,41 @@ void Hffi_lua_func(ffi_cif* cif,void* ret,void** args,void* ud){
                         }else{
                             *(void**)ret = *((void**)str->data);
                         }
+                        return;
                     }
+                    harray* arr = hffi_value_get_harray(hs);
+                    if(arr != NULL){
+                        if(hs->base_ffi_type == HFFI_TYPE_POINTER){
+                            *(void**)ret = arr->data;
+                        }else{
+                            *(void**)ret = *((void**)arr->data);
+                        }
+                        return;
+                    }
+                    //default as ptr.
+                    *(void**)ret = hs->ptr;
                 }
+            }else if(luaL_testudata(L, -1, __STR(hffi_struct))){
+                hffi_struct* str = get_ptr_hffi_struct(L, -1);
+                if(fc->closure->ret_val->base_ffi_type == HFFI_TYPE_POINTER){
+                    *(void**)ret = str->data;
+                }else{
+                    *(void**)ret = *((void**)str->data);
+                }
+                return;
+            }else if(luaL_testudata(L, -1, __STR(harray))){
+                harray* arr = get_ptr_harray(L, -1);
+                if(fc->closure->ret_val->base_ffi_type == HFFI_TYPE_POINTER){
+                    *(void**)ret = arr->data;
+                }else{
+                    *(void**)ret = *((void**)arr->data);
+                }
+                return;
             }
         }break;
+
+        default:
+            luaL_error(L, "wrong return type. only support 'number/value/struct/array'.");
         }
         //TODO return can be number, char[], ptr.
         //lua_push
@@ -1021,6 +1047,7 @@ void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
     }else{
         luaL_checktype(L, 3, LUA_TFUNCTION);
     }
+    //TODO no need table 2?
 
     int type;
     int ref_ctx, ref_func = LUA_NOREF;
@@ -1035,6 +1062,7 @@ void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
     switch (type) {
     case LUA_TUSERDATA:{
         val_ret = get_ptr_hffi_value(L, -1);
+        hffi_value_ref(val_ret, 1);
         lua_pushnil(L);
         lua_setfield(L, 1 ,"ret");
     }break;
@@ -1058,45 +1086,58 @@ void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
     fc->ref_func = ref_func;
     //tab
     int c = lua_rawlen(L, 1);
-    fc->ext_infos = MALLOC(sizeof (int) * (HLUA_EXT_LEN + 1) * c); //with ret
+    //fc->ext_infos = MALLOC(sizeof (int) * (HLUA_EXT_LEN + 1) * c); //with ret
     //
     array_list* in_vals = array_list_new2(c * 4 / 3 + 1);
     for(int i = 0 ; i < c ; i ++){
         lua_rawgeti(L, 1, i + 1);
         if(luaL_testudata(L, -1, __STR(hffi_value))){
             array_list_add(in_vals, get_ptr_hffi_value(L, -1));
-            if(lua_rawgeti(L, 2, i + 1) == LUA_TTABLE){ ;//ext member
-                if(hlua_get_ext_info(L, -1, fc->ext_infos + i * HLUA_EXT_LEN) != 0){
-                    goto failed;
-                }
-            }
-            lua_pop(L, 1);
+//            if(lua_rawgeti(L, 2, i + 1) == LUA_TTABLE){ ;//ext member
+//                if(hlua_get_ext_info(L, -1, fc->ext_infos + i * HLUA_EXT_LEN) != 0){
+//                    goto failed;
+//                }
+//            }
+//            lua_pop(L, 1);
         }else{
             goto failed;
         }
         lua_pop(L, 1);
     }
     //ret desc
-    if(lua_rawgeti(L, 2, HLUA_EXT_LEN + 1) == LUA_TTABLE){ ;//ext member
-        if(hlua_get_ext_info(L, -1, fc->ext_infos + HLUA_EXT_LEN * c) != 0){
-            goto failed;
-        }
-    }
-    lua_pop(L, 1);
+//    if(lua_rawgeti(L, 2, HLUA_EXT_LEN + 1) == LUA_TTABLE){ ;//ext member
+//        if(hlua_get_ext_info(L, -1, fc->ext_infos + HLUA_EXT_LEN * c) != 0){
+//            goto failed;
+//        }
+//    }
+//    lua_pop(L, 1);
     //closure
     hffi_closure* clo = hffi_new_closure(Hffi_lua_func, in_vals, val_ret, fc, NULL);
     hffi_closure_ref(clo, 1);
     fc->closure = clo;
     push_ptr_hffi_closure(L, clo);
+    lua_pushlightuserdata(L, fc);
+    lua_setuservalue(L, -2);
+    if(val_ret != hffi_get_void_value()){
+        hffi_delete_value(val_ret);
+    }
     return 1;
+
     failed:
     array_list_delete2(in_vals, NULL);
     __delete_FuncContext(fc);
+    if(val_ret != hffi_get_void_value()){
+        hffi_delete_value(val_ret);
+    }
     return 0;
 }
 static int xffi_closure_gc(lua_State* L){
     hffi_closure* clo = get_ptr_hffi_closure(L, -1);
-    hffi_delete_closure(clo);
+    if(hffi_delete_closure(clo) == 1){
+        //only left the one
+        lua_getuservalue(L, 1);
+        __delete_FuncContext((FuncContext*)lua_topointer(L, -1));
+    }
     return 0;
 }
 static const luaL_Reg g_hffi_closure_Methods[] = {

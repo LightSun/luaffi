@@ -97,11 +97,9 @@ void testClosure2(){
    ///声明一个函数指针,通过此指针动态调用已准备好的函数
    void* func;
 
-   /* Allocate closure and bound_calCircleArea */  //创建closure
    closure = ffi_closure_alloc(sizeof(ffi_closure), &func);
 
    if (closure) {
-       /* Initialize the argument info vectors */
        args[0] = &ffi_type_pointer;
        int c = 2;
        ffi_type* type = malloc(sizeof (ffi_type) + sizeof (ffi_type*) * (c + 1));
@@ -119,24 +117,57 @@ void testClosure2(){
             printf("wrong struct: ");
             return;
        }
-       printf("after get offsets: size = %d, alignment = %d\n", type->size, type->alignment);
+       printf("after get offsets: size = %d, alignment = %d\n", type->size, type->alignment);//8, 4
 
-       /* Initialize the cif */  //生成函数原型 &ffi_type_float：返回值类型
        if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, 1, type, args) == FFI_OK) {
-           /* Initialize the closure, setting stream to stdout */
-               // 通过 ffi_closure 把 函数原型_cifPtr / 函数实体JPBlockInterpreter / 上下文对象self / 函数指针blockImp 关联起来
-           if (ffi_prep_closure_loc(closure, &cif, Test_closure2_func,stdout, func) == FFI_OK) {
+           //stdout is user data
+           if (ffi_prep_closure_loc(closure, &cif, Test_closure2_func, stdout, func) == FFI_OK) {
                    float r = 10.0;
-                   //当执行了bound_calCircleArea函数时，获得所有输入参数, 后续将执行calCircleArea。
-                   //动态调用calCircleArea
                    struct Test_closure2 rc = ((Test_closure2_cb)func)(&r);
                    printf("testClosure2 >>> rc.a = %d, rc.b = %d\n",rc.a, rc.b);
                }
        }
        free(type);
    }
-   /* Deallocate both closure, and bound_calCircleArea */
-   ffi_closure_free(closure);   //释放闭包
+   ffi_closure_free(closure);
+}
+
+//NOTE: can't be ok by struct not align
+void testClosure3(){
+   printf("-------- testClosure3 --------\n");
+   ffi_cif cif;
+   ffi_type *args[1];
+   ffi_closure *closure;
+
+   void* func;
+
+   closure = ffi_closure_alloc(sizeof(ffi_closure), &func);
+
+   if (closure) {
+       args[0] = &ffi_type_pointer;
+       ffi_type* ffi_type_nullptr = NULL;
+
+       int c = 2;
+       ffi_type* type = malloc(sizeof (ffi_type) + sizeof (ffi_type*) * (c + 1));
+       type->type = FFI_TYPE_STRUCT;
+       type->alignment = 1;
+       type->size = 6;
+       //type->elements = (ffi_type**)(type + 1);
+       type->elements = &ffi_type_nullptr;
+       //type->elements[0] = &ffi_type_sint32;
+       //type->elements[1] = &ffi_type_sint8;
+
+       if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, 1, type, args) == FFI_OK) {
+           //stdout is user data
+           if (ffi_prep_closure_loc(closure, &cif, Test_closure2_func, stdout, func) == FFI_OK) {
+                   float r = 10.0;
+                   struct Test_closure2 rc = ((Test_closure2_cb)func)(&r);
+                   printf("testClosure2 >>> rc.a = %d, rc.b = %d\n",rc.a, rc.b);
+               }
+       }
+       free(type);
+   }
+   ffi_closure_free(closure);
 }
 
 void testCall2(){
