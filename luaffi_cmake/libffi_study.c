@@ -28,6 +28,8 @@ void calCircleArea(ffi_cif * cif,
                   float *ret,
                   void *args[],
                   FILE * ud) {
+    //input: float* --- float
+    //args[0]: float** --- float*
     float pi = 3.14;
     float r = **(float **)args[0];
     float area = pi * r * r;
@@ -67,6 +69,76 @@ void testClosure(){
    /* Deallocate both closure, and bound_calCircleArea */
    ffi_closure_free(closure);   //释放闭包
 }
+
+struct Test_closure2{
+   int a;
+   signed char b;
+};
+typedef struct Test_closure2 (*Test_closure2_cb)(float *);
+
+void Test_closure2_func(ffi_cif * cif,
+                  void *ret,
+                  void *args[],
+                  void * ud) {
+    struct Test_closure2* clo = malloc(sizeof (struct Test_closure2));
+    clo->a = 100;
+    clo->b = 10;
+    //*((struct Test_closure2*)ret) = *clo; //ok
+    void** d = clo;
+    *(void**)ret = *d; //ok
+}
+
+void testClosure2(){
+   printf("-------- testClosure2 --------\n");
+   ffi_cif cif;
+   ffi_type *args[1];
+   ffi_closure *closure;
+
+   ///声明一个函数指针,通过此指针动态调用已准备好的函数
+   void* func;
+
+   /* Allocate closure and bound_calCircleArea */  //创建closure
+   closure = ffi_closure_alloc(sizeof(ffi_closure), &func);
+
+   if (closure) {
+       /* Initialize the argument info vectors */
+       args[0] = &ffi_type_pointer;
+       int c = 2;
+       ffi_type* type = malloc(sizeof (ffi_type) + sizeof (ffi_type*) * (c + 1));
+       type->type = FFI_TYPE_STRUCT;
+       type->alignment = 0;
+       type->size = 0;
+       type->elements = (ffi_type**)(type + 1);
+       type->elements[c] = NULL;
+       type->elements[0] = &ffi_type_sint32;
+       type->elements[1] = &ffi_type_sint8;
+       size_t offsets[2];
+       //must use 'ffi_get_struct_offsets'
+       if(ffi_get_struct_offsets(FFI_DEFAULT_ABI, type, offsets) != FFI_OK){
+            free(type);
+            printf("wrong struct: ");
+            return;
+       }
+       printf("after get offsets: size = %d, alignment = %d\n", type->size, type->alignment);
+
+       /* Initialize the cif */  //生成函数原型 &ffi_type_float：返回值类型
+       if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, 1, type, args) == FFI_OK) {
+           /* Initialize the closure, setting stream to stdout */
+               // 通过 ffi_closure 把 函数原型_cifPtr / 函数实体JPBlockInterpreter / 上下文对象self / 函数指针blockImp 关联起来
+           if (ffi_prep_closure_loc(closure, &cif, Test_closure2_func,stdout, func) == FFI_OK) {
+                   float r = 10.0;
+                   //当执行了bound_calCircleArea函数时，获得所有输入参数, 后续将执行calCircleArea。
+                   //动态调用calCircleArea
+                   struct Test_closure2 rc = ((Test_closure2_cb)func)(&r);
+                   printf("testClosure2 >>> rc.a = %d, rc.b = %d\n",rc.a, rc.b);
+               }
+       }
+       free(type);
+   }
+   /* Deallocate both closure, and bound_calCircleArea */
+   ffi_closure_free(closure);   //释放闭包
+}
+
 void testCall2(){
     printf("------- testCall2 ------ \n");
     void* functionPtr = &testFunc2;

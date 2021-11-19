@@ -154,9 +154,8 @@ struct harray* hffi_value_get_harray(hffi_value* val);
 /** only used for pointer.,  continueMemory: sometimes, some memory malloc split for array-array. */
 struct harray* hffi_value_get_pointer_as_array(hffi_value* val, int rows, int cols, int continue_mem, int share_mem);
 
-hffi_struct* hffi_value_get_pointer_as_struct(hffi_value* val, hffi_struct* style, int share_memory);
 //ext: the ext infos for 'int rows, int cols, int continue_mem, int share_mem'.
-int hffi_value_set_any(hffi_value* val, void* val_ptr, int* ext);
+int hffi_value_set_any(hffi_value* val, void* val_ptr);
 //--------- for test ----------
 int hffi_value_set_base(hffi_value* val, void* in_ptr);
 
@@ -238,6 +237,8 @@ hffi_struct* hffi_struct_get_struct(hffi_struct* hs, int index);
 struct harray* hffi_struct_get_harray(hffi_struct* hs, int index);
 struct harray* hffi_struct_get_as_array(hffi_struct* hs, int index, sint8 hffi_t,int rows, int cols,
                                  int continue_mem, int share_memory);
+
+int hffi_struct_set_all(struct hffi_struct* c, void* ptr);
 //----------------- manager -------------------
 
 hffi_manager* hffi_new_manager();

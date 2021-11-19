@@ -299,11 +299,14 @@ static int xffi_harray_new(lua_State* L){
         }
         harray* arr;
         if(lua_type(L, 2) == LUA_TNUMBER){
+            //type, count
             int c = luaL_checkinteger(L, 2);
-            arr = harray_new(luaL_checkinteger(L, 1), c);
+            arr = harray_new((sint8)luaL_checkinteger(L, 1), c);
         }else{
+            //
+            luaL_checktype(L, 2, LUA_TTABLE);
             int c = lua_rawlen(L, 2);
-            arr = harray_new(luaL_checkinteger(L, 1), c);
+            arr = harray_new((sint8)luaL_checkinteger(L, 1), c);
             for(int i = 0 ; i < c; i ++){
                 lua_rawgeti(L, 2, i + 1); //type, tab, ele
                 __harray_set_vals(L, arr, i);
@@ -940,25 +943,58 @@ void Hffi_lua_func(ffi_cif* cif,void* ret,void** args,void* ud){
     H_UNSED(cif);
     H_UNSED(ret);
     H_UNSED(args);
+    //ret can be simple int/float. array. struct?
     FuncContext* fc = ud;
     lua_State *L = fc->L;
     lua_rawgeti(L, HLUA_REF_ID_FUNC, fc->ref_func);
     lua_rawgeti(L, HLUA_REF_ID_CTX, fc->ref_ctx);
+    //tab as args
     lua_newtable(L);
     int c = array_list_size(fc->closure->in_vals);
     hffi_value* tmp_val;
     for(int i = 0 ; i < c ; i ++){
         tmp_val = (hffi_value*)array_list_get(fc->closure->in_vals, i);
-        hffi_value_set_any(tmp_val, args[i], fc->ext_infos + i * HLUA_EXT_LEN);
+        hffi_value_set_any(tmp_val, args[i]);
         push_ptr_hffi_value(L, tmp_val);
         lua_rawseti(L, -2, i + 1);
     }
-    //lua_push
-    hffi_value_set_any(fc->closure->ret_val, ret, fc->ext_infos + c * HLUA_EXT_LEN);
-    push_ptr_hffi_value(L, fc->closure->ret_val);
-    //ctx, tab(in_vals), ret_val.
+
+    //ctx, tab(in_vals).
     int ret_call;
-    if((ret_call = lua_pcall(L, 3, 0, 0)) == LUA_OK){
+    if((ret_call = lua_pcall(L, 2, 1, 0)) == LUA_OK){
+        switch (lua_type(L, -1)) {
+        case LUA_TNUMBER:{
+            if(fc->closure->ret_val->base_ffi_type == HFFI_TYPE_FLOAT
+                    || fc->closure->ret_val->base_ffi_type == HFFI_TYPE_DOUBLE){
+                *(lua_Number*)ret = lua_tonumber(L, -1);
+            }else{
+                *(lua_Integer*)ret = lua_tointeger(L, -1);
+            }
+        }break;
+
+        case LUA_TSTRING:{
+            //char array?
+        }break;
+        case LUA_TUSERDATA:{
+            if(luaL_testudata(L, -1, __STR(hffi_value))){
+                hffi_value* hs = get_ptr_hffi_value(L, -1);
+                if(hffi_value_get_base(hs, ret) != HFFI_STATE_OK){
+                    hffi_struct* str = hffi_value_get_struct(hs);
+                    if(str != NULL){
+                        if(hs->base_ffi_type == HFFI_TYPE_POINTER){
+                            *(void**)ret = str->data;
+                        }else{
+                            *(void**)ret = *((void**)str->data);
+                        }
+                    }
+                }
+            }
+        }break;
+        }
+        //TODO return can be number, char[], ptr.
+        //lua_push
+        //hffi_value_set_any(fc->closure->ret_val, ret, fc->ext_infos + c * HLUA_EXT_LEN);
+        //push_ptr_hffi_value(L, fc->closure->ret_val);
         return;
     }
     switch (ret_call) {
@@ -1014,7 +1050,7 @@ void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
         return luaL_error(L, "for create closure. ret type must be value/hffi_type");
     }
     lua_pop(L, 1);
-
+    //build a context for hold some values
     FuncContext* fc = MALLOC(sizeof(FuncContext));
     memset(fc, 0, sizeof (FuncContext));
     fc->L = L;
@@ -1022,15 +1058,15 @@ void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
     fc->ref_func = ref_func;
     //tab
     int c = lua_rawlen(L, 1);
-    int ext_len = 4;
-    fc->ext_infos = MALLOC(sizeof (int) * (ext_len + 1) * c); //with ret
+    fc->ext_infos = MALLOC(sizeof (int) * (HLUA_EXT_LEN + 1) * c); //with ret
+    //
     array_list* in_vals = array_list_new2(c * 4 / 3 + 1);
     for(int i = 0 ; i < c ; i ++){
         lua_rawgeti(L, 1, i + 1);
         if(luaL_testudata(L, -1, __STR(hffi_value))){
             array_list_add(in_vals, get_ptr_hffi_value(L, -1));
             if(lua_rawgeti(L, 2, i + 1) == LUA_TTABLE){ ;//ext member
-                if(hlua_get_ext_info(L, -1, fc->ext_infos + i * ext_len) != 0){
+                if(hlua_get_ext_info(L, -1, fc->ext_infos + i * HLUA_EXT_LEN) != 0){
                     goto failed;
                 }
             }
@@ -1041,8 +1077,8 @@ void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
         lua_pop(L, 1);
     }
     //ret desc
-    if(lua_rawgeti(L, 2, ext_len + 1) == LUA_TTABLE){ ;//ext member
-        if(hlua_get_ext_info(L, -1, fc->ext_infos + ext_len * c) != 0){
+    if(lua_rawgeti(L, 2, HLUA_EXT_LEN + 1) == LUA_TTABLE){ ;//ext member
+        if(hlua_get_ext_info(L, -1, fc->ext_infos + HLUA_EXT_LEN * c) != 0){
             goto failed;
         }
     }

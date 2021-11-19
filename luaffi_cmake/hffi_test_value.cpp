@@ -146,6 +146,10 @@ TEST(testCase,test_as_array4){
     data[0]=intr1;
     data[1]=intr2;
 
+    //*(**)data = %p, ((**)data)[0]=%p. is the same.
+   // printf("--- test_as_array4 ---: data = %p, *(**)data = %p, ((**)data)[0]=%p\n",
+   //        data, *(void**)data, ((void**)data)[0]);
+
     intr1[0] = 10;
     intr1[1] = 11;
     intr1[2] = 12;

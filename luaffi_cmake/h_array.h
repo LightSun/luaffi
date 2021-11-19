@@ -67,6 +67,7 @@ void harray_ref(harray* arr, int c);
 int harray_geti(harray* arr, int index, union harray_ele* ptr);
 int harray_seti(harray* arr, int index, union harray_ele* ptr);
 int harray_seti2(harray* arr, int index, void* ptr);
+int harray_set_all(harray* arr, void* ptr);
 
 int harray_eq(harray* arr, harray* arr2);
 

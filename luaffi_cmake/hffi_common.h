@@ -49,6 +49,7 @@ typedef void (*hffi_fn)(void);
 
 #define HFFI_STATE_OK 0
 #define HFFI_STATE_FAILED -1
+#define HFFI_TRUE HFFI_STATE_OK
 
 #define HFFI_TYPE_VOID FFI_TYPE_VOID
 #define HFFI_TYPE_INT FFI_TYPE_INT
@@ -102,6 +103,8 @@ int hffi_struct_get_data_size(struct hffi_struct* c);
  * @param ref_count: the reference count
  */
 void hffi_struct_ref(struct hffi_struct* c, int ref_count);
+
+int hffi_struct_set_all(struct hffi_struct* c, void* ptr);
 
 struct hffi_struct* hffi_struct_copy(struct hffi_struct* src);
 int hffi_struct_eq(struct hffi_struct* hs1, struct hffi_struct* hs2);

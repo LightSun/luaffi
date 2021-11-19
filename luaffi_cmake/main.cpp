@@ -11,6 +11,8 @@ extern "C"{
 void testCall();
 void testCall2();
 void testClosure();
+void testClosure2();
+
 void hffi_test1();
 void hffi_test2();
 void hffi_test_struct();
@@ -49,6 +51,7 @@ static void test_ffi_all(){
     testCall();
     testCall2();
     testClosure();
+    testClosure2();
     hffi_test1();
     hffi_test2();
     hffi_test_struct();

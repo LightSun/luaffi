@@ -5,3 +5,6 @@
 3, hffi_struct for lua not done.
 4, dym_func for lua not done.
 5, hffi_cif for lua not done.
+
+### read me
+- ffi: struct must use 'ffi_get_struct_offsets' to align.

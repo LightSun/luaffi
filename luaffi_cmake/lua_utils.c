@@ -65,6 +65,7 @@ int hlua_get_ext_info(lua_State* L, int tab_idx, int* infos){
     int share_mem = 1;
     infos[0] = hlua_get_boolean(L, tab_idx, "continue_mem", continue_mem);
     infos[1] = hlua_get_boolean(L, tab_idx, "share_mem", share_mem);
+    //infos[1] = hlua_get_boolean(L, tab_idx, "hffi_t", share_mem);
 
     if(lua_rawlen(L, tab_idx) == 0) {
         return -1;
