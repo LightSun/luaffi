@@ -607,18 +607,113 @@ static int xffi_struct_index(lua_State *L){
         __INDEX_METHOD("getTypeAlignment", __struct_typeAlignment)
         return luaL_error(L, "unsupport method('%s') for smtype.", fun_name);
     }
+    hffi_struct* hs = get_ptr_hffi_struct(L, 1);
+    int index = luaL_checkinteger(L, 2);
+    if(index >= hs->count){
+        return 0;
+    }
+    sint8 ffi_t = hs->hffi_types[index];
+    if(ffi_t == HFFI_TYPE_POINTER){
+        //unknown.
+        return 0;
+    }
+    if(ffi_t == HFFI_TYPE_FLOAT || ffi_t == HFFI_TYPE_DOUBLE){
+        lua_Number num;
+        hffi_struct_get_base(hs, index, HFFI_TYPE_INT, &num);
+        lua_pushnumber(L, num);
+        return 1;
+    }else{
+        lua_Integer num;
+        if(hffi_struct_get_base(hs, index, HFFI_TYPE_INT, &num) == HFFI_STATE_OK){
+            lua_pushinteger(L, num);
+            return 1;
+        }
+        hffi_struct* hstr = hffi_struct_get_struct(hs, index);
+        if(hstr != NULL){
+             hffi_struct_ref(hstr, 1);
+             return push_ptr_hffi_struct(L, hstr);
+        }
+        harray* arr = hffi_struct_get_harray(hs, index);
+        if(hstr != NULL){
+             harray_ref(arr, 1);
+             return push_ptr_harray(L, arr);
+        }
+    }
     return 0;
 }
+static int xffi_struct_newindex(lua_State *L){
+    //tab, index, val
+    hffi_struct* hs = get_ptr_hffi_struct(L, 1);
+    int index = luaL_checkinteger(L, 2);
+    if(index >= hs->count) return luaL_error(L, "index out of range. max index is %d, bit is %d",
+                                             hs->count - 1, index);
+    switch (hs->hffi_types[index]) {
+    case HFFI_TYPE_POINTER:{
+        return luaL_error(L, "struct doesn't support index pointer-type.");
+    }break;
+
+    case HFFI_TYPE_INT:
+    case HFFI_TYPE_SINT8:
+    case HFFI_TYPE_UINT8:
+    case HFFI_TYPE_SINT16:
+    case HFFI_TYPE_UINT16:
+    case HFFI_TYPE_SINT32:
+    case HFFI_TYPE_UINT32:
+    case HFFI_TYPE_SINT64:
+    case HFFI_TYPE_UINT64:{
+        lua_Integer num = luaL_checkinteger(L, 3);
+        hffi_struct_set_base(hs, index, HFFI_TYPE_INT, &num);
+        return 0;
+    }break;
+
+    case  HFFI_TYPE_FLOAT:
+    case  HFFI_TYPE_DOUBLE:{
+        lua_Number num = luaL_checknumber(L, 3);
+        hffi_struct_set_base(hs, index, HFFI_TYPE_FLOAT, &num);
+        return 0;
+    }break;
+
+    case HFFI_TYPE_HARRAY:
+    case HFFI_TYPE_HARRAY_PTR:{
+        harray* arr = get_ptr_harray(L, 3);
+        if(hffi_struct_set_harray(hs, index, arr) == HFFI_STATE_OK){
+            return 0;
+        }
+        return luaL_error(L, "set array(member) for struct failed.");
+    }break;
+
+    case HFFI_TYPE_STRUCT:
+    case HFFI_TYPE_STRUCT_PTR:{
+        hffi_struct* new_hs = get_ptr_hffi_struct(L, 3);
+        if(hffi_struct_set_struct(hs, index, new_hs) == HFFI_STATE_OK){
+            return 0;
+        }
+         return luaL_error(L, "set struct(member) for struct failed.");
+    }break;
+    }
+    return 0;
+}
+
 static int xffi_struct_count(lua_State* L){
     hffi_struct* _struct = get_ptr_hffi_struct(L, -1);
-    lua_pushnumber(L, _struct->count);
+    lua_pushinteger(L, _struct->count);
+    return 1;
+}
+static int xffi_struct_tostring(lua_State* L){
+    hffi_struct* hstr = get_ptr_hffi_struct(L, -1);
+    hstring* hs = hstring_new();
+    hffi_struct_dump(hstr, hs);
+    lua_pushstring(L, hstring_tostring(hs));
+    hstring_delete(hs);
     return 1;
 }
 
 static const luaL_Reg g_hffi_struct_Methods[] = {
     {"__gc", xffi_struct_gc},
     {"__index", xffi_struct_index},
+    {"__newindex", xffi_struct_newindex},
     {"__len", xffi_struct_count},
+    {"__tostring", xffi_struct_tostring},
     {NULL, NULL}
 };
 //------------------ hffi_value ------------

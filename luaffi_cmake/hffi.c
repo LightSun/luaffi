@@ -1273,7 +1273,7 @@ hffi_struct* hffi_struct_get_struct(hffi_struct* hs, int index){
     }else{
         return NULL;
     }
-    if(ffi_t == HFFI_TYPE_STRUCT){
+    if(ffi_t == HFFI_TYPE_STRUCT && hs->data){
         //need sync data.
         size_t * offsets = (size_t *) &hs->type->elements[hs->count+1];
         void* data_ptr = hs->data + offsets[index];
@@ -1294,7 +1294,7 @@ struct harray* hffi_struct_get_harray(hffi_struct* hs, int index){
     }else{
         return NULL;
     }
-    if(ffi_t == HFFI_TYPE_HARRAY){
+    if(ffi_t == HFFI_TYPE_HARRAY && hs->data){
         //need sync data.
         size_t * offsets = (size_t *) &hs->type->elements[hs->count+1];
         void* data_ptr = hs->data + offsets[index];
@@ -1420,6 +1420,76 @@ int hffi_struct_set_all(struct hffi_struct* hs, void* ptr){
     }
     return HFFI_STATE_OK;
 }
+
+int hffi_struct_set_harray(hffi_struct* hs, int index, struct harray* arr){
+    if(arr == NULL || index >= hs->count) return HFFI_STATE_FAILED;
+    size_t * offsets = HFFI_STRUCT_OFFSETS(hs->type, hs->count);
+    void* data_ptr = hs->data + offsets[index];
+
+    int ffi_t = hs->hffi_types[index];
+    if(ffi_t == HFFI_TYPE_HARRAY){
+        //check data_size_match.
+        if((int)hs->type->elements[index]->size != arr->data_size){
+            return HFFI_STATE_FAILED;
+        }
+        memcpy(data_ptr, arr->data, arr->data_size);
+        struct_item* item = array_list_find(hs->children, __struct_find_struct_harray, &index);
+        if(item != NULL){
+            harray* old_arr = item->ptr;
+            harray_delete(old_arr);
+            harray_ref(arr, 1);
+            item->ptr = arr;
+            return HFFI_STATE_OK;
+        }
+    }else if(ffi_t == HFFI_TYPE_HARRAY_PTR){
+        struct_item* item = array_list_find(hs->children, __struct_find_struct_harray, &index);
+        if(item != NULL){
+            harray_ref(arr, 1);
+            ((void**)data_ptr)[0] = arr;
+            //unref-old ref new
+            harray* old_arr = item->ptr;
+            harray_delete(old_arr);
+            item->ptr = arr;
+            return HFFI_STATE_OK;
+        }
+    }
+    return HFFI_STATE_FAILED;
+}
+int hffi_struct_set_struct(hffi_struct* hs, int index, hffi_struct* arr){
+    if(arr == NULL || index >= hs->count) return HFFI_STATE_FAILED;
+    size_t * offsets = HFFI_STRUCT_OFFSETS(hs->type, hs->count);
+    void* data_ptr = hs->data + offsets[index];
+
+    int ffi_t = hs->hffi_types[index];
+    if(ffi_t == HFFI_TYPE_HARRAY){
+        //check data_size_match.
+        if((int)hs->type->elements[index]->size != arr->data_size){
+            return HFFI_STATE_FAILED;
+        }
+        memcpy(data_ptr, arr->data, arr->data_size);
+        struct_item* item = array_list_find(hs->children, __struct_find_struct_harray, &index);
+        if(item != NULL){
+            hffi_struct* old_arr = item->ptr;
+            hffi_delete_struct(old_arr);
+            hffi_struct_ref(arr, 1);
+            item->ptr = arr;
+            return HFFI_STATE_OK;
+        }
+    }else if(ffi_t == HFFI_TYPE_HARRAY_PTR){
+        struct_item* item = array_list_find(hs->children, __struct_find_struct_harray, &index);
+        if(item != NULL){
+            ((void**)data_ptr)[0] = arr;
+            hffi_struct_ref(arr, 1);
+            //unref-old ref new
+            hffi_struct* old_arr = item->ptr;
+            hffi_delete_struct(old_arr);
+            item->ptr = arr;
+            return HFFI_STATE_OK;
+        }
+    }
+    return HFFI_STATE_FAILED;
+}
+
 void hffi_struct_dump(hffi_struct* arr, struct hstring* hs){
     size_t* offsets = HFFI_STRUCT_OFFSETS(arr->type, arr->count);
     hstring_append(hs, "[ type_desc: \n");

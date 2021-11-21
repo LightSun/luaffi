@@ -246,6 +246,8 @@ struct harray* hffi_struct_get_as_array(hffi_struct* hs, int index, sint8 hffi_t
                                  int continue_mem, int share_memory);
 
 //int hffi_struct_set_all(struct hffi_struct* c, void* ptr);
+int hffi_struct_set_harray(hffi_struct* hs, int index, struct harray* arr);
+int hffi_struct_set_struct(hffi_struct* hs, int index, hffi_struct* hs_val);
 
 //----------------- manager -------------------
 
