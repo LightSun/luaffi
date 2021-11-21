@@ -6,6 +6,7 @@
 #include "h_alloctor.h"
 #include "h_list.h"
 #include "h_array.h"
+#include "h_string.h"
 
 #define hffi_new_value_auto_x(ffi_t,type) \
 hffi_value* hffi_new_value_##type(type val){\
@@ -194,7 +195,7 @@ static inline ffi_type* __harray_to_ffi_type(int abi, harray* arr, array_list* s
             harray_geti(arr, i , &ele);
             type->elements[i] = ((hffi_struct*)ele._extra)->type;
         }
-        size_t* offsets = HFFI_OFFSETS(type, c);
+        size_t* offsets = HFFI_STRUCT_OFFSETS(type, c);
         if(ffi_get_struct_offsets(abi, type, offsets) != FFI_OK){
             success = 0;
         }
@@ -218,7 +219,7 @@ static inline ffi_type* __harray_to_ffi_type(int abi, harray* arr, array_list* s
             type->elements[i] = tmp_type;
         }
         if(success){
-            size_t* offsets = HFFI_OFFSETS(type, c);
+            size_t* offsets = HFFI_STRUCT_OFFSETS(type, c);
             if(ffi_get_struct_offsets(abi, type, offsets) != FFI_OK){
                 success = 0;
             }
@@ -235,7 +236,7 @@ static inline ffi_type* __harray_to_ffi_type(int abi, harray* arr, array_list* s
         for(int i = 0 ; i < c ; i ++){
             type->elements[i] = &ffi_type_pointer;
         }
-        size_t* offsets = HFFI_OFFSETS(type, c);
+        size_t* offsets = HFFI_STRUCT_OFFSETS(type, c);
         if(ffi_get_struct_offsets(abi, type, offsets) != FFI_OK){
             success = 0;
         }
@@ -245,14 +246,15 @@ static inline ffi_type* __harray_to_ffi_type(int abi, harray* arr, array_list* s
     {
         //https://github.com/libffi/libffi/issues/394, not work(test on windows).
         ffi_type* sub_type = to_ffi_type(arr->hffi_t, NULL);
-        type = MALLOC(sizeof (ffi_type));
+        type = MALLOC(HFFI_STRUCT_TYPE_SIZE(c));
         type->type = FFI_TYPE_STRUCT;
         type->alignment = type->size = 0;
+        type->elements = (ffi_type**)(type + 1);
         type->elements[c] = NULL;
         for(int i = 0 ; i < c ; i ++){
             type->elements[i] = sub_type;
         }
-        size_t* offsets = HFFI_OFFSETS(type, c);
+        size_t* offsets = HFFI_STRUCT_OFFSETS(type, c);
         if(ffi_get_struct_offsets(abi, type, offsets) != FFI_OK){
             success = 0;
         }
@@ -1104,7 +1106,7 @@ hffi_struct* hffi_struct_copy(hffi_struct* _hs){
         type->elements[i] = tmp_type;
     }
     //copy offsets
-    memcpy(HFFI_OFFSETS(type, count), HFFI_OFFSETS(_hs->type, count), sizeof (size_t) * count);
+    memcpy(HFFI_STRUCT_OFFSETS(type, count), HFFI_STRUCT_OFFSETS(_hs->type, count), sizeof (size_t) * count);
 
     //type, children, sub_types
     hffi_struct* ptr = MALLOC(sizeof(hffi_struct));
@@ -1374,6 +1376,10 @@ int hffi_struct_set_all(struct hffi_struct* hs, void* ptr){
     }else{
         memcpy(hs->data, ptr, hs->data_size);
     }
+    //remove no data flag
+    if(hs->parent_pos == HFFI_STRUCT_NO_DATA){
+        hs->parent_pos = HFFI_STRUCT_NO_PARENT;
+    }
     size_t * offsets = (size_t *) &hs->type->elements[hs->count+1];
     int count = array_list_size(hs->children);
 
@@ -1413,6 +1419,80 @@ int hffi_struct_set_all(struct hffi_struct* hs, void* ptr){
         }
     }
     return HFFI_STATE_OK;
+}
+void hffi_struct_dump(hffi_struct* arr, struct hstring* hs){
+    size_t* offsets = HFFI_STRUCT_OFFSETS(arr->type, arr->count);
+    hstring_append(hs, "[ type_desc: \n");
+    hstring_appendf(hs, "size = %d", arr->type->size);
+    hstring_appendf(hs, " ,align = %d\n", arr->type->alignment);
+    hstring_append(hs, " ,offsets = ");
+    for(int i = 0 ; i < arr->count ; i++){
+        hstring_appendf(hs, "%d", offsets[i]);
+        if(i != arr->count - 1){
+            hstring_append(hs, ", ");
+        }
+    }
+    hstring_append(hs, " \n,member_types = ");
+
+#define __TYPE_STR(ffi_t, type)\
+case ffi_t: hstring_append(hs, type); break;
+
+    for(int i = 0 ; i < arr->count ; i++){
+        DEF_HFFI_SWITCH_ALL(__TYPE_STR, arr->hffi_types[i])
+       // hstring_appendf(hs, "%d", arr->hffi_types[i]);
+        if(i != arr->count - 1){
+            hstring_append(hs, ", ");
+        }
+    }
+    hstring_append(hs, "\n ]");
+    //dump data.
+    if(!arr->data){
+        hstring_append(hs, " data = NULL");
+    }else{
+        hstring_append(hs, " data = \n [");
+#define __struct_dump_impl(hffi_t, type, format)\
+case hffi_t:{\
+    void* data_ptr = arr->data + offsets[i];\
+    hstring_appendf(hs, format, ((type*)data_ptr)[0]);\
+    if(i != arr->count - 1){\
+        hstring_append(hs, " ,");\
+    }\
+}continue;
+
+        for(int i = 0 ; i < arr->count ; i++){
+            DEF_HFFI_SWITCH_BASE_FORMAT(__struct_dump_impl, arr->hffi_types[i])
+            switch (arr->hffi_types[i]) {
+                case HFFI_TYPE_HARRAY:{
+                    hstring_append(hs, " \n<array> ");
+                    harray* harr = hffi_struct_get_harray(arr, i);
+                    harray_dump(harr, hs);
+                }break;
+                case HFFI_TYPE_HARRAY_PTR:{
+                    hstring_append(hs, " \n<array_ptr> ");
+                    harray* harr = hffi_struct_get_harray(arr, i);
+                    harray_dump(harr, hs);
+                }break;
+                case HFFI_TYPE_STRUCT:{
+                    hstring_append(hs, " \n<struct> ");
+                    hffi_struct* child_hs = hffi_struct_get_struct(arr, i);
+                    hffi_struct_dump(child_hs, hs);
+                }break;
+                case HFFI_TYPE_STRUCT_PTR:{
+                    hstring_append(hs, " \n<struct_ptr> ");
+                    hffi_struct* child_hs = hffi_struct_get_struct(arr, i);
+                    hffi_struct_dump(child_hs, hs);
+                }break;
+
+                case HFFI_TYPE_POINTER:{
+                    hstring_append(hs, " \n<struct_ptr> ");
+                    hstring_appendf(hs, "%p", arr->data + offsets[i]);
+                }break;
+                default:{
+                    hstring_append(hs, " \n<unknown> ");
+                }break;
+            }
+        }
+    }
 }
 
 //--------------------------------------------

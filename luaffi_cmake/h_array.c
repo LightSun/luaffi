@@ -605,42 +605,79 @@ case hffi_t:{\
         if(i != 0){hstring_append(hs, ", ");}\
         hstring_appendf(hs, format, ((type*)arr->data)[i]);\
     }\
+    hstring_append(hs, "]");\
+    return;\
 }break;
 
 void harray_dump(harray* arr, struct hstring* hs){
-    hstring_append(hs, "[");
-    switch (arr->hffi_t) {
-    harray_dump_impl(HFFI_TYPE_SINT8, sint8, "%d");
-    harray_dump_impl(HFFI_TYPE_UINT8, uint8, "%d");
-    harray_dump_impl(HFFI_TYPE_SINT16, sint16, "%d");
-    harray_dump_impl(HFFI_TYPE_UINT16, uint16, "%u");
-    harray_dump_impl(HFFI_TYPE_SINT32, sint32, "%d");
-    harray_dump_impl(HFFI_TYPE_UINT32, uint32, "%u");
-    harray_dump_impl(HFFI_TYPE_SINT64, sint64, "%lld");
-    harray_dump_impl(HFFI_TYPE_UINT64, uint64, "%llu");
-    harray_dump_impl(HFFI_TYPE_INT, sint32, "%d");
+#define __HARRAY_TYPE_STR(ffi_t, type)\
+case ffi_t: hstring_append(hs, type); break;
 
-    case HFFI_TYPE_HARRAY:
+    hstring_appendf(hs, "[ desc: count = %d, ele_size = %d, ele_type = ", arr->ele_count, arr->data_size / arr->ele_count);
+    DEF_HFFI_SWITCH_ALL(__HARRAY_TYPE_STR, arr->hffi_t)
+    hstring_append(hs, " ]\n data: [");
+
+    DEF_HFFI_SWITCH_BASE_FORMAT(harray_dump_impl, arr->hffi_t)
+    switch (arr->hffi_t) {
+        case HFFI_TYPE_HARRAY:{
+            hstring_append(hs, "\n<array> ");
+            union harray_ele ele;
+            for(int i = 0 ; i < arr->ele_count ; i ++){
+                harray_geti(arr, i, &ele);
+                if(ele._extra != NULL){
+                    harray_dump((harray*)ele._extra, hs);
+                }else{
+                    hstring_append(hs, "null");
+                }
+                if(i != 0){
+                    hstring_append(hs, ", ");
+                }
+            }
+        }break;
     case HFFI_TYPE_HARRAY_PTR:{
+            hstring_append(hs, "\n<array_ptr> ");
         union harray_ele ele;
         for(int i = 0 ; i < arr->ele_count ; i ++){
             harray_geti(arr, i, &ele);
-            if(i != 0){
-                hstring_append(hs, ", ");
-            }
             if(ele._extra != NULL){
-                harray_dump(ele._extra, hs);
+                harray_dump((harray*)ele._extra, hs);
             }else{
                 hstring_append(hs, "null");
             }
+            if(i != 0){
+                hstring_append(hs, ", ");
+            }
         }
     }break;
-    //TODO latter support struct
     case HFFI_TYPE_STRUCT:{
-         hstring_append(hs, "<struct>");
+        hstring_append(hs, "\n<struct> ");
+        union harray_ele ele;
+        for(int i = 0 ; i < arr->ele_count ; i ++){
+            harray_geti(arr, i, &ele);
+            if(ele._extra != NULL){
+                hffi_struct_dump((struct hffi_struct*)ele._extra, hs);
+            }else{
+                hstring_append(hs, "null");
+            }
+            if(i != 0){
+                hstring_append(hs, ", ");
+            }
+        }
     }break;
     case HFFI_TYPE_STRUCT_PTR:{
-        hstring_append(hs, "<struct_ptr>");
+        hstring_append(hs, "\n<struct_ptr>");
+        union harray_ele ele;
+        for(int i = 0 ; i < arr->ele_count ; i ++){
+            harray_geti(arr, i, &ele);
+            if(ele._extra != NULL){
+                hffi_struct_dump((struct hffi_struct*)ele._extra, hs);
+            }else{
+                hstring_append(hs, "null");
+            }
+            if(i != 0){
+                hstring_append(hs, ", ");
+            }
+        }
     }break;
     }
     hstring_append(hs, "]");

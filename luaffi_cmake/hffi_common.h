@@ -66,7 +66,7 @@ typedef void (*hffi_fn)(void);
 #define HFFI_TYPE_STRUCT FFI_TYPE_STRUCT
 #define HFFI_TYPE_POINTER FFI_TYPE_POINTER
 
-#define HFFI_TYPE_STRING (FFI_TYPE_LAST + 1)
+//#define HFFI_TYPE_STRING (FFI_TYPE_LAST + 1)
 #define HFFI_TYPE_HARRAY (FFI_TYPE_LAST + 2)
 #define HFFI_TYPE_HARRAY_PTR (FFI_TYPE_LAST + 3)
 #define HFFI_TYPE_STRUCT_PTR (FFI_TYPE_LAST + 4)
@@ -90,7 +90,44 @@ macro(HFFI_TYPE_DOUBLE, double)\
 macro(HFFI_TYPE_INT, sint32)\
 }
 
+#define DEF_HFFI_SWITCH_BASE_FORMAT(macro, ffi_t)\
+switch (ffi_t) {\
+macro(HFFI_TYPE_SINT8, sint8, "%d")\
+macro(HFFI_TYPE_UINT8, uint8, "%d")\
+macro(HFFI_TYPE_SINT16, sint16, "%d")\
+macro(HFFI_TYPE_UINT16, uint16, "%u")\
+macro(HFFI_TYPE_SINT32, sint32, "%d")\
+macro(HFFI_TYPE_UINT32, uint32, "%u")\
+macro(HFFI_TYPE_SINT64, sint64, "%lld")\
+macro(HFFI_TYPE_UINT64, uint64, "%llu")\
+macro(HFFI_TYPE_INT, sint32, "%d")\
+macro(HFFI_TYPE_FLOAT, float, "%g")\
+macro(HFFI_TYPE_DOUBLE, double, "%g")\
+}
+
+#define DEF_HFFI_SWITCH_ALL(macro, ffi_t)\
+switch (ffi_t) {\
+macro(HFFI_TYPE_SINT8, "sint8")\
+macro(HFFI_TYPE_UINT8, "uint8")\
+macro(HFFI_TYPE_SINT16, "sint16")\
+macro(HFFI_TYPE_UINT16, "uint16")\
+macro(HFFI_TYPE_SINT32, "sint32")\
+macro(HFFI_TYPE_UINT32, "uint32")\
+macro(HFFI_TYPE_SINT64, "sint64")\
+macro(HFFI_TYPE_UINT64, "uint64")\
+macro(HFFI_TYPE_FLOAT, "float")\
+macro(HFFI_TYPE_DOUBLE, "double")\
+macro(HFFI_TYPE_INT, "sint32")\
+macro(HFFI_TYPE_VOID, "void")\
+macro(HFFI_TYPE_HARRAY, "<array>")\
+macro(HFFI_TYPE_HARRAY_PTR, "<array_ptr>")\
+macro(HFFI_TYPE_STRUCT, "<struct>")\
+macro(HFFI_TYPE_STRUCT_PTR, "<struct_ptr>")\
+macro(HFFI_TYPE_CLOSURE, "<closure>")\
+}
+
 struct hffi_struct;
+struct hstring;
 
 void hffi_delete_struct(struct hffi_struct* c);
 
@@ -108,5 +145,6 @@ int hffi_struct_set_all(struct hffi_struct* c, void* ptr);
 
 struct hffi_struct* hffi_struct_copy(struct hffi_struct* src);
 int hffi_struct_eq(struct hffi_struct* hs1, struct hffi_struct* hs2);
+void hffi_struct_dump(struct hffi_struct* arr, struct hstring* hs);
 
 #endif // HFFI_COMMON_H

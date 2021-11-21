@@ -68,8 +68,11 @@ static const BasePair _BASE_PAIRS[] = {
     {"long", HFFI_TYPE_SINT64},
     {"int", HFFI_TYPE_SINT32},
     {"uint", HFFI_TYPE_UINT32},
-
-    {"string", HFFI_TYPE_STRING},
+    //----- internal types -------
+    {"array", HFFI_TYPE_HARRAY},
+    {"array_ptr", HFFI_TYPE_HARRAY_PTR},
+    {"struct", HFFI_TYPE_STRUCT},
+    {"struct_ptr", HFFI_TYPE_STRUCT_PTR},
     {NULL, 0},
 };
 
@@ -210,13 +213,24 @@ static int __harray_func_set(lua_State* L){
     return 0;
 }
 static int __harray_func_copy(lua_State* L){
-    //copy
     harray* arr = get_ptr_harray(L, lua_upvalueindex(1));
     return push_ptr_harray(L, harray_copy(arr));
+}
+static int __harray_func_eletype(lua_State* L){
+    harray* arr = get_ptr_harray(L, lua_upvalueindex(1));
+    lua_pushnumber(L, arr->hffi_t);
+    return 1;
+}
+static int __harray_func_elesize(lua_State* L){
+    harray* arr = get_ptr_harray(L, lua_upvalueindex(1));
+    lua_pushnumber(L, arr->data_size/ arr->ele_count);
+    return 1;
 }
 static const luaL_Reg g_harray_str_Methods[] = {
     {"set", __harray_func_set},
     {"copy", __harray_func_copy},
+    {"eletype", __harray_func_eletype},
+    {"elesize", __harray_func_elesize},
     {NULL, NULL}
 };
 static int xffi_harray_index(lua_State* L){
@@ -525,7 +539,8 @@ static int __struct_get(lua_State *L){
         harray* arr = hffi_struct_get_as_array(hs, index, hffi_t, rows, cols, continue_mem, share_mem);
         return push_ptr_harray(L, arr);
     }
-    //index
+    //index [,target_ffi_t]
+    //target_ffi_t: is for pointer.
     int index = luaL_checkinteger(L, 1);
     hffi_struct* hstr = hffi_struct_get_struct(hs, index);
     if(hstr != NULL){
@@ -555,19 +570,55 @@ static int __struct_get(lua_State *L){
     }
     return 0;
 }
+static int __struct_getOffsets(lua_State *L){
+    hffi_struct* hs = get_ptr_hffi_struct(L, lua_upvalueindex(1));
+    size_t* offsets = HFFI_STRUCT_OFFSETS(hs->type, hs->count);
+    lua_newtable(L);
+    for(int i = 0 ; i < hs->count ; i++){
+        lua_pushinteger(L, offsets[i]);
+        lua_rawseti(L, -2, i + 1);
+    }
+    return 1;
+}
+static int __struct_typeSize(lua_State *L){
+    hffi_struct* hs = get_ptr_hffi_struct(L, lua_upvalueindex(1));
+    lua_pushinteger(L, hs->type->size);
+    return 1;
+}
+static int __struct_typeAlignment(lua_State *L){
+    hffi_struct* hs = get_ptr_hffi_struct(L, lua_upvalueindex(1));
+    lua_pushinteger(L, hs->type->alignment);
+    return 1;
+}
+static int __struct_memberType(lua_State *L){
+    hffi_struct* hs = get_ptr_hffi_struct(L, lua_upvalueindex(1));
+    int index = luaL_checkinteger(L, 1);
+    if(index >= hs->count) return 0;
+    return hs->hffi_types[index];
+}
 static int xffi_struct_index(lua_State *L){
     if(lua_type(L, 2) == LUA_TSTRING){
         const char* fun_name = lua_tostring(L, 2);
         __INDEX_METHOD("copy", __struct_copy)
         __INDEX_METHOD("get", __struct_get)
+        __INDEX_METHOD("getMembertype", __struct_memberType)
+        __INDEX_METHOD("getOffsets", __struct_getOffsets)
+        __INDEX_METHOD("getTypeSize", __struct_typeSize)
+        __INDEX_METHOD("getTypeAlignment", __struct_typeAlignment)
         return luaL_error(L, "unsupport method('%s') for smtype.", fun_name);
     }
     return 0;
+}
+static int xffi_struct_count(lua_State* L){
+    hffi_struct* _struct = get_ptr_hffi_struct(L, -1);
+    lua_pushnumber(L, _struct->count);
+    return 1;
 }
 
 static const luaL_Reg g_hffi_struct_Methods[] = {
     {"__gc", xffi_struct_gc},
     {"__index", xffi_struct_index},
+    {"__len", xffi_struct_count},
     {NULL, NULL}
 };
 //------------------ hffi_value ------------
@@ -1163,6 +1214,17 @@ static int xffi_undefines(lua_State *L){
 #undef unreg_t
     return 0;
 }
+static int xffi_typeStr(lua_State *L){
+    sint8 type = (sint8)luaL_checkinteger(L, 1);
+    const BasePair *lib;
+    for (lib = _BASE_PAIRS; lib->name; lib++) {
+       if(lib->type == type){
+           lua_pushstring(L, lib->name);
+           return 1;
+       }
+    }
+    return 0;
+}
 
 //----------------------------------------
 static inline void setfield_function(lua_State* L,
@@ -1186,6 +1248,7 @@ LUAMOD_API void register_ffi(lua_State *L){
     // the ffi table is still on top
     setfield_function(L, "defines", xffi_defines);
     setfield_function(L, "undefines", xffi_undefines);
+    setfield_function(L, "typeStr", xffi_typeStr);
 
     setfield_function(L, "loadLib", xffi_dym_lib_new);
     setfield_function(L, "cif", xffi_cif);

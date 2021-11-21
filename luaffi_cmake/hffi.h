@@ -3,7 +3,7 @@
 #include "hffi_common.h"
 
 // offsets = (size_t *) &type->elements[c+1];
-#define HFFI_OFFSETS(type, c)  (size_t *)&type->elements[c+1]
+#define HFFI_STRUCT_OFFSETS(type, c)  (size_t *)&type->elements[c+1]
 #define HFFI_STRUCT_TYPE_SIZE(c) (sizeof (ffi_type) + sizeof (ffi_type*) * (c + 1) + sizeof (size_t) * c)
 
 #define hffi_new_value_auto_x_def(type) \
@@ -21,6 +21,7 @@ while(p[n] != NULL){\
 struct linklist_node;
 struct array_list;
 struct harray;
+struct hstring;
 
 typedef struct hffi_value{
     sint8 base_ffi_type;            // see ffi.h
@@ -244,7 +245,8 @@ struct harray* hffi_struct_get_harray(hffi_struct* hs, int index);
 struct harray* hffi_struct_get_as_array(hffi_struct* hs, int index, sint8 hffi_t,int rows, int cols,
                                  int continue_mem, int share_memory);
 
-int hffi_struct_set_all(struct hffi_struct* c, void* ptr);
+//int hffi_struct_set_all(struct hffi_struct* c, void* ptr);
+
 //----------------- manager -------------------
 
 hffi_manager* hffi_new_manager();
