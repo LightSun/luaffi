@@ -45,7 +45,7 @@ LUALIB_API void luaL_openlibs2(lua_State *L, const luaL_Reg funcs[]) {
   }
 }
 
-#define LUA_DIR "../luaffi_cmake/lua_script/"
+#define LUA_DIR "../luaffi_cmake/lua_script"
 
 static void test_ffi_all(){
     test_harray();
@@ -85,7 +85,7 @@ extern "C" int main()
     }
     CALL_LUA(L, [](lua_State * L){
         //test_libc.lua
-        return luaL_dofile(L, LUA_DIR "test_array.lua");
+        return luaL_dofile(L, LUA_DIR "/tests.lua");
     });
 
     lua_close(L);

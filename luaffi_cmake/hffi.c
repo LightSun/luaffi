@@ -1492,29 +1492,28 @@ int hffi_struct_set_struct(hffi_struct* hs, int index, hffi_struct* arr){
 
 void hffi_struct_dump(hffi_struct* arr, struct hstring* hs){
     size_t* offsets = HFFI_STRUCT_OFFSETS(arr->type, arr->count);
-    hstring_append(hs, "[ type_desc: \n");
+    hstring_append(hs, "[ type_desc: ");
     hstring_appendf(hs, "size = %d", arr->type->size);
-    hstring_appendf(hs, " ,align = %d\n", arr->type->alignment);
-    hstring_append(hs, " ,offsets = ");
+    hstring_appendf(hs, ", align = %d", arr->type->alignment);
+    hstring_append(hs, ", offsets = (");
     for(int i = 0 ; i < arr->count ; i++){
         hstring_appendf(hs, "%d", offsets[i]);
         if(i != arr->count - 1){
             hstring_append(hs, ", ");
         }
     }
-    hstring_append(hs, " \n,member_types = ");
+    hstring_append(hs, "), member_types = (");
 
 #define __TYPE_STR(ffi_t, type)\
 case ffi_t: hstring_append(hs, type); break;
 
     for(int i = 0 ; i < arr->count ; i++){
         DEF_HFFI_SWITCH_ALL(__TYPE_STR, arr->hffi_types[i])
-       // hstring_appendf(hs, "%d", arr->hffi_types[i]);
         if(i != arr->count - 1){
             hstring_append(hs, ", ");
         }
     }
-    hstring_append(hs, "\n ]");
+    hstring_append(hs, " )]\n");
     //dump data.
     if(!arr->data){
         hstring_append(hs, " data = NULL");
@@ -1562,6 +1561,7 @@ case hffi_t:{\
                 }break;
             }
         }
+        hstring_append(hs, " ]");
     }
 }
 

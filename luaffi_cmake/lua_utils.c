@@ -81,6 +81,7 @@ int hlua_get_ext_info(lua_State* L, int tab_idx, int* infos){
 }
 
 void hlua_push_light_uservalue(lua_State* L, int tab_idx, void* ud, Fun_delete delete){
+    tab_idx = HLUA_ADJUST_ID(tab_idx);
     struct HDataWrapper* w = MALLOC(sizeof (struct HDataWrapper));
     w->data = ud;
     w->func = delete;
@@ -92,13 +93,15 @@ void* hlua_get_light_uservalue(lua_State* L, int tab_index){
     if(lua_getuservalue(L, tab_index) == LUA_TNIL){
         return NULL;
     }
-    struct HDataWrapper* w = (struct HDataWrapper*)lua_topointer(L, -1);
+    struct HDataWrapper* w = (struct HDataWrapper*)lua_touserdata(L, -1);
     lua_pop(L, 1);
     return w->data;
 }
 void hlua_delete_light_uservalue(lua_State* L, int tab_index){
-    lua_getuservalue(L, tab_index);
-    struct HDataWrapper* w = (struct HDataWrapper*)lua_topointer(L, -1);
+    if(lua_getuservalue(L, tab_index) == LUA_TNIL){
+        return;
+    }
+    struct HDataWrapper* w = (struct HDataWrapper*)lua_touserdata(L, -1);
     lua_pop(L, 1);
     if(atomic_add(&w->ref, -1) == 1){
         w->func(w->data);
@@ -107,8 +110,10 @@ void hlua_delete_light_uservalue(lua_State* L, int tab_index){
 }
 
 void hlua_share_light_uservalue(lua_State* L, int tab_old, int tab_new){
-    lua_getuservalue(L, tab_old);
-    struct HDataWrapper* w = (struct HDataWrapper*)lua_topointer(L, -1);
+    if(lua_getuservalue(L, tab_old) == LUA_TNIL){
+        return;
+    }
+    struct HDataWrapper* w = (struct HDataWrapper*)lua_touserdata(L, -1);
     atomic_add(&w->ref, 1);
     lua_setuservalue(L, tab_new);
 }

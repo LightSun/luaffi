@@ -507,8 +507,9 @@ static int xffi_struct_gc(lua_State *L){
 }
 static int __struct_copy(lua_State *L){
     hffi_struct* hs = get_ptr_hffi_struct(L, lua_upvalueindex(1));
+    lua_pushvalue(L, lua_upvalueindex(1));
     push_ptr_hffi_struct(L, hffi_struct_copy(hs));
-    hlua_share_light_uservalue(L, lua_upvalueindex(1), -1);
+    hlua_share_light_uservalue(L, 1, -1);
     return 1;
 }
 static int __struct_get(lua_State *L){
