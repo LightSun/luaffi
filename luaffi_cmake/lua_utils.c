@@ -172,3 +172,155 @@ int build_smtypes(lua_State* L, array_list* sm_list, array_list* sm_names,
     return HFFI_STATE_OK;
 }
 
+harray* hlua_new_harray_from_table(lua_State* L, int idx, Func_get_ptr_struct func_struct, Func_get_ptr_harray func_harray){
+    //table(harray/struct/string/base/...)
+    //len: the char array size, which used to create string
+    //base_type: base ffi type, which indicate the memory size
+    //asPtr: element as ptr or not. for harrays and structs. need this
+    int len = 0;
+    int asPtr = 0;
+    sint8 base_type = HFFI_TYPE_INT;
+    int has_data = 1;
+    if(lua_type(L, idx + 1) == LUA_TTABLE){
+        len = hlua_get_int(L, idx + 1, "len", len);
+        base_type = (sint8)hlua_get_int(L, idx + 1, "type", base_type);
+        asPtr = hlua_get_boolean(L, idx + 1, "asPtr", asPtr);
+        has_data = hlua_get_boolean(L, idx + 1, "has_data", asPtr);
+    }
+
+    int count = lua_rawlen(L, idx);
+    if(count == 0) return NULL;
+
+    //do build harray
+    array_list* list = array_list_new2(count * 4 / 3 + 1);
+    switch (lua_rawgeti(L, idx, 1)) {
+    case LUA_TNUMBER: {
+        lua_pop(L, 1);
+        harray* p_arr = harray_new(base_type, count);
+        for(int i = 0 ; i < count ; i ++){
+            lua_rawgeti(L, idx, i + 1);
+            if(base_type == HFFI_TYPE_FLOAT || base_type == HFFI_TYPE_DOUBLE){
+                lua_Number num = lua_tonumber(L, 3);
+                harray_seti2(p_arr, i, &num);
+            }else{
+                lua_Integer num = lua_tointeger(L, 3);
+                harray_seti2(p_arr, i, &num);
+            }
+            lua_pop(L, 1);
+        }
+        return p_arr;
+    } break;
+
+    case LUA_TSTRING: {
+        if(len <= 0){
+            //find max len
+            const char* chs = lua_tostring(L, -1);
+            len = strlen(chs) +1;
+            lua_pop(L, 1);
+            for(int i = 1 ; i < count ; i ++){
+                lua_rawgeti(L, idx, i + 1);
+                const char* chs1 = lua_tostring(L, -1);
+                if((int)strlen(chs1) + 1 > len){
+                    len = strlen(chs1) + 1;
+                }
+                lua_pop(L, 1);
+            }
+        }else{
+            lua_pop(L, 1);
+        }
+        harray* p_arr = harray_new(asPtr ? HFFI_TYPE_HARRAY_PTR: HFFI_TYPE_HARRAY, count);
+        harray* tmp_arr;
+        union harray_ele ele;
+        for(int i = 0 ; i < count ; i ++){
+            lua_rawgeti(L, idx, i + 1);
+            ele._extra = tmp_arr = harray_new_chars2(lua_tostring(L, -1), len);
+            //harray_seti will ref + 1, so we need - 1.
+            harray_ref(tmp_arr, -1);
+            harray_seti(p_arr, i, &ele);
+            lua_pop(L, 1);
+        }
+        return p_arr;
+    } break;
+
+    case LUA_TUSERDATA: {
+        if(luaL_testudata(L, -1, __STR(harray))){
+            array_list_add(list, func_harray(L, -1));
+            lua_pop(L, 1);
+            for(int i = 1 ; i < count ; i ++){
+                lua_rawgeti(L, idx, i + 1);
+                if(luaL_testudata(L, -1, __STR(harray))){
+                    array_list_add(list, func_harray(L, -1));
+                }else{
+                    array_list_delete2(list, NULL);
+                    luaL_error(L, "create harray for arrays. we need only harray.");
+                    return NULL;
+                }
+                lua_pop(L, 1);
+            }
+            //prepare out harray
+            harray* arr;
+            if(asPtr){
+                if(has_data){
+                    arr = harray_new_array_ptr(count);
+                    //set data
+                    union harray_ele ele;
+                    for(int i = 0 ; i < count ; i ++){
+                        ele._extra = array_list_get(list, i);
+                        harray_seti(arr, i, &ele);
+                    }
+                 }else{
+                     arr = harray_new_array_ptr_nodata(count);
+                     for(int i = 0 ; i < count ; i ++){
+                         harray_set_harray_ptr(arr, i, (harray*)array_list_get(list, i));
+                     }
+                }
+            }else{
+                arr = has_data ? harray_new_arrays(list) : harray_new_arrays_nodata(list);
+            }
+            array_list_delete2(list, NULL);
+            return arr;
+
+        }else if(luaL_testudata(L, -1, __STR(hffi_struct))){
+            array_list_add(list, func_struct(L, -1));
+            lua_pop(L, 1);
+            for(int i = 1 ; i < count ; i ++){
+                lua_rawgeti(L, idx, i + 1);
+                if(luaL_testudata(L, -1, __STR(hffi_struct))){
+                    array_list_add(list, func_struct(L, -1));
+                }else{
+                    array_list_delete2(list, NULL);
+                    luaL_error(L, "create harray for structs. we need only 'hffi_struct'.");
+                    return NULL;
+                }
+                lua_pop(L, 1);
+            }
+            harray* arr;
+            if(asPtr){
+                if(has_data){
+                    arr = harray_new_struct_ptr(count);
+                    //set data
+                    union harray_ele ele;
+                    for(int i = 0 ; i < count ; i ++){
+                        ele._extra = array_list_get(list, i);
+                        harray_seti(arr, i, &ele);
+                    }
+                }else{
+                    arr = harray_new_struct_ptr_nodata(count);
+                    //set data
+                    for(int i = 0 ; i < count ; i ++){
+                        harray_set_struct_ptr(arr, i, (hffi_struct*)array_list_get(list, i));
+                    }
+                }
+            }else{
+                arr = harray_new_structs(list);
+            }
+            array_list_delete2(list, NULL);
+            return arr;
+        }
+    }break;
+    }
+
+    return NULL;
+}
+
+

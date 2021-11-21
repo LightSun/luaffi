@@ -46,7 +46,7 @@ TEST(testCase,test_struct1){
     sint16 hs_val1 = 5;
     EXPECT_EQ(hffi_struct_set_base(hs, 0, 0, &hs_val1), HFFI_STATE_OK);
     //build func desc
-    hffi_struct* hs_ret = hffi_new_struct_from_list_no_data(FFI_DEFAULT_ABI, list, NULL);
+    hffi_struct* hs_ret = hffi_new_struct_from_list_nodata(FFI_DEFAULT_ABI, list, NULL);
     hffi_fn fn = (hffi_fn)func1;
     hffi_value* p1 = hffi_new_value_struct(hs);
     hffi_value* ret = hffi_new_value_struct_ptr(hs_ret);

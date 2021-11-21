@@ -33,6 +33,7 @@ union harray_ele{
 };
 
 harray* harray_new(sint8 hffi_t, int count);
+harray* harray_new_nodata(sint8 hffi_t, int count);
 /**
  * @brief harray_new_array: create an array. element is array-ptr.
  * @param count
@@ -40,10 +41,15 @@ harray* harray_new(sint8 hffi_t, int count);
  */
 harray* harray_new_array_ptr(int count);
 harray* harray_new_struct_ptr(int count);
+harray* harray_new_array_ptr_nodata(int count);
+harray* harray_new_struct_ptr_nodata(int count);
 //the struct type must be the same
 harray* harray_new_structs(struct array_list* structs);
 //every array type must be the same
 harray* harray_new_arrays(struct array_list* arrays);
+
+harray* harray_new_structs_nodata(struct array_list* structs);
+harray* harray_new_arrays_nodata(struct array_list* arrays);
 /**
  * @brief harray_new_array: create an array. element is char.
  * @param count
@@ -68,6 +74,9 @@ int harray_geti(harray* arr, int index, union harray_ele* ptr);
 int harray_seti(harray* arr, int index, union harray_ele* ptr);
 int harray_seti2(harray* arr, int index, void* ptr);
 int harray_set_all(harray* arr, void* ptr);
+
+int harray_set_struct_ptr(harray* arr, int index, struct hffi_struct* str);
+int harray_set_harray_ptr(harray* arr, int index, harray* str);
 
 int harray_eq(harray* arr, harray* arr2);
 

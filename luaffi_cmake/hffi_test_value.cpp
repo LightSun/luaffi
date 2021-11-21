@@ -35,7 +35,7 @@ TEST(testCase,test0){
 TEST(testCase,test_as_array){
     //mazy.
     hffi_value* val;
-    val = hffi_new_value_ptr_no_data(HFFI_TYPE_INT);
+    val = hffi_new_value_ptr_nodata(HFFI_TYPE_INT);
     int* _intr = (int*)malloc(sizeof(int) *6);
     _intr[0] = 10;
     _intr[1] = 11;
@@ -60,7 +60,7 @@ TEST(testCase,test_as_array){
 TEST(testCase,test_as_array2){
     //mazy.
     hffi_value* val;
-    val = hffi_new_value_ptr_no_data(HFFI_TYPE_INT);
+    val = hffi_new_value_ptr_nodata(HFFI_TYPE_INT);
     int* _intr = (int*)malloc(sizeof(int) *6);
     _intr[0] = 10;
     _intr[1] = 11;
@@ -96,7 +96,7 @@ TEST(testCase,test_as_array2){
 
 TEST(testCase,test_as_array3){
     hffi_value* val;
-    val = hffi_new_value_ptr_no_data(HFFI_TYPE_INT);
+    val = hffi_new_value_ptr_nodata(HFFI_TYPE_INT);
     void** data = (void**)malloc(sizeof(void*) * 2);
     int* intr1 = (int*)malloc(sizeof(int) *3);
     int* intr2 = (int*)malloc(sizeof(int) *3);
@@ -139,7 +139,7 @@ TEST(testCase,test_as_array3){
 
 TEST(testCase,test_as_array4){
     hffi_value* val;
-    val = hffi_new_value_ptr_no_data(HFFI_TYPE_INT);
+    val = hffi_new_value_ptr_nodata(HFFI_TYPE_INT);
     void** data = (void**)malloc(sizeof(void*) * 2);
     int* intr1 = (int*)malloc(sizeof(int) *3);
     int* intr2 = (int*)malloc(sizeof(int) *3);

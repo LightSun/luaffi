@@ -97,7 +97,7 @@ ffi_type* to_ffi_type(int8_t ffi_t, char** error_msg);
 //only alloc base needed memory.
 hffi_value* hffi_new_value_ptr(sint8 hffi_t2);
 /* create value. without data. that means the data will be allocate by an extra function. */
-hffi_value* hffi_new_value_ptr_no_data(sint8 hffi_t2);
+hffi_value* hffi_new_value_ptr_nodata(sint8 hffi_t2);
 //auto alloc memory for target size
 hffi_value* hffi_new_value(sint8 hffi_t1, sint8 hffi_t2, int size);
 hffi_new_value_auto_x_def(sint8)
@@ -220,7 +220,7 @@ hffi_struct* hffi_new_struct_abi(int abi,hffi_smtype** member_types, char** msg)
  */
 hffi_struct* hffi_new_struct_from_list2(int abi,struct array_list* member_types, char** msg);
 hffi_struct* hffi_new_struct_from_list(struct array_list* member_types, char** msg);
-hffi_struct* hffi_new_struct_from_list_no_data(int abi,struct array_list* member_types, char** msg);
+hffi_struct* hffi_new_struct_from_list_nodata(int abi,struct array_list* member_types, char** msg);
 /**
  * @brief hffi_new_struct_base:create struct by base types. except struct or its' pointer.
  * @param types: the base types. see HFFI_TYPE_<X>
@@ -278,7 +278,7 @@ hffi_closure* hffi_closure_copy(hffi_closure* c);
 void hffi_closure_ref(hffi_closure* hc, int c);
 
 //---------------------- cif ------------------------
-hffi_cif* hffi_new_cif(int abi, struct array_list* in_vals, hffi_value* out, char** msg);
+hffi_cif* hffi_new_cif(int abi, struct array_list* in_vals, int var_count,hffi_value* out, char** msg);
 void hffi_delete_cif(hffi_cif* hcif);
 void hffi_cif_ref(hffi_cif* hcif, int c);
 void hffi_cif_call(hffi_cif* hcif, void* fun);

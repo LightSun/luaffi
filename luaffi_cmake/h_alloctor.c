@@ -30,5 +30,5 @@ void* h_alloctor_alloc(int new_size){
 }
 
 void h_alloctor_free(void* data){
-    _func(data);
+    if(data) _func(data);
 }

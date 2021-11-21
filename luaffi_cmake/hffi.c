@@ -303,7 +303,7 @@ hffi_value* hffi_new_value(sint8 hffi_t, sint8 hffi_t2, int size){
     val_ptr->ref = 1;   
     return val_ptr;
 }
-hffi_value* hffi_new_value_ptr_no_data(sint8 hffi_t2){
+hffi_value* hffi_new_value_ptr_nodata(sint8 hffi_t2){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
     val_ptr->ptr = NULL;
@@ -580,7 +580,7 @@ ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg){
     if(val->base_ffi_type == HFFI_TYPE_HARRAY){
         if(!val->ffi_type){
             if(!val->sub_types) val->sub_types = array_list_new2(4);
-            val->ffi_type = __harray_to_ffi_type(val->ptr, val->sub_types);
+            val->ffi_type = __harray_to_ffi_type(FFI_DEFAULT_ABI,val->ptr, val->sub_types);
         }
         return val->ffi_type;
     }
@@ -883,7 +883,7 @@ hffi_struct* hffi_new_struct_base_abi(int abi,sint8* types, int count){
 hffi_struct* hffi_new_struct_from_list2(int abi,struct array_list* list, char** msg){
     return hffi_new_struct_from_list0(abi, list, HFFI_STRUCT_NO_PARENT, msg);
 }
-hffi_struct* hffi_new_struct_from_list_no_data(int abi,struct array_list* list, char** msg){
+hffi_struct* hffi_new_struct_from_list_nodata(int abi,struct array_list* list, char** msg){
     return hffi_new_struct_from_list0(abi, list, HFFI_STRUCT_NO_DATA, msg);
 }
 hffi_struct* hffi_new_struct_from_list(struct array_list* list, char** msg){
@@ -1004,7 +1004,7 @@ static inline hffi_struct* hffi_new_struct_from_list0(int abi,struct array_list*
     }
     ptr->children = children;
     ptr->ref = 1;
-    //for HFFI_STRUCT_NO_DATA. the data will be malloc by function.
+    //for HFFI_STRUCT_NO_DATA. the data will be malloc by other.
     ptr->parent_pos = parent_pos;
     ptr->sub_ffi_types = sub_types;
     ptr->abi = (sint8)abi;
@@ -1580,18 +1580,21 @@ void hffi_closure_ref(hffi_closure* hc, int c){
 }
 //------------------------------------
 //abi: default is 'FFI_DEFAULT_ABI'
-hffi_cif* hffi_new_cif(int abi,array_list* in_vals, hffi_value* out, char** msg){
+hffi_cif* hffi_new_cif(int abi,array_list* in_vals, int var_count,hffi_value* out, char** msg){
     int in_count = array_list_size(in_vals);
+    array_list* ins = array_list_new2(array_list_size(in_vals) * 4 / 3 + 1);
     //add ref
     hffi_value* val;
     for(int i = 0 ; i < in_count ; i ++){
         val = array_list_get(in_vals, i);
         atomic_add(&val->ref, 1);
+        array_list_add(ins, val);
     }
     atomic_add(&out->ref, 1);
     //build args
     ffi_type ** argTypes = NULL;
     void **args = NULL;
+    ffi_cif* cif = NULL;
     if(in_count > 0){
         argTypes = alloca(sizeof(ffi_type *) *in_count);
         args = MALLOC(sizeof(void *) *in_count);
@@ -1599,7 +1602,7 @@ hffi_cif* hffi_new_cif(int abi,array_list* in_vals, hffi_value* out, char** msg)
             val = array_list_get(in_vals, i);
             argTypes[i] = hffi_value_get_rawtype(val, msg);
             if(argTypes[i] == NULL){
-                return NULL;
+                goto failed;
             }
             //cast param value
             args[i] = __get_data_ptr(val);
@@ -1608,11 +1611,15 @@ hffi_cif* hffi_new_cif(int abi,array_list* in_vals, hffi_value* out, char** msg)
     //prepare cif
     ffi_type *return_type = hffi_value_get_rawtype(out, msg);
     if(return_type == NULL){
-        return NULL;
+        goto failed;
     }
-    ffi_cif* cif = MALLOC(sizeof (ffi_cif));
-
-    ffi_status s = ffi_prep_cif(cif, abi, (unsigned int)in_count, return_type, argTypes);
+    cif = MALLOC(sizeof (ffi_cif));
+    ffi_status s;
+    if(var_count > 0){
+        s = ffi_prep_cif_var(cif, abi, in_count - var_count,(unsigned int)in_count, return_type, argTypes);
+    }else{
+        s = ffi_prep_cif(cif, abi, (unsigned int)in_count, return_type, argTypes);
+    }
     switch (s) {
     case FFI_OK:{
        // ffi_call(&cif, fn, __get_data_ptr(out), args);
@@ -1620,7 +1627,7 @@ hffi_cif* hffi_new_cif(int abi,array_list* in_vals, hffi_value* out, char** msg)
         hffi_cif* hcif = MALLOC(sizeof (hffi_cif));
         hcif->cif = cif;
         hcif->args = args;
-        hcif->in_vals = in_vals;
+        hcif->in_vals = ins;
         hcif->out = out;
         hcif->ref = 1;
         return hcif;
@@ -1637,12 +1644,9 @@ hffi_cif* hffi_new_cif(int abi,array_list* in_vals, hffi_value* out, char** msg)
         }
         break;
     }
+    failed:
     FREE(cif);
-    //ref
-    for(int i = 0 ; i < in_count ; i ++){
-        val = array_list_get(in_vals, i);
-        hffi_delete_value(val);
-    }
+    array_list_delete2(ins, list_travel_value_delete);
     hffi_delete_value(out);
     FREE(args);
     return NULL;
