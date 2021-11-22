@@ -269,19 +269,19 @@ static inline ffi_type* __harray_to_ffi_type(int abi, harray* arr, array_list* s
 ffi_type* to_ffi_type(int8_t v, char** msg){
 #define hffi_TO_TYPE(t, v) case t:{ return &v;}
     switch (v) {
-    hffi_TO_TYPE(FFI_TYPE_POINTER, ffi_type_pointer)
-    hffi_TO_TYPE(FFI_TYPE_SINT8, ffi_type_sint8)
-    hffi_TO_TYPE(FFI_TYPE_UINT8, ffi_type_uint8)
-    hffi_TO_TYPE(FFI_TYPE_SINT16, ffi_type_sint16)
-    hffi_TO_TYPE(FFI_TYPE_UINT16, ffi_type_uint16)
-    hffi_TO_TYPE(FFI_TYPE_UINT32, ffi_type_uint32)
-    hffi_TO_TYPE(FFI_TYPE_SINT32, ffi_type_sint32)
-    hffi_TO_TYPE(FFI_TYPE_INT, ffi_type_sint32)
-    hffi_TO_TYPE(FFI_TYPE_UINT64, ffi_type_uint64)
-    hffi_TO_TYPE(FFI_TYPE_SINT64, ffi_type_sint64)
-    hffi_TO_TYPE(FFI_TYPE_FLOAT, ffi_type_float)
-    hffi_TO_TYPE(FFI_TYPE_DOUBLE, ffi_type_double)
-    hffi_TO_TYPE(FFI_TYPE_VOID, ffi_type_void)
+    hffi_TO_TYPE(HFFI_TYPE_POINTER, ffi_type_pointer)
+    hffi_TO_TYPE(HFFI_TYPE_SINT8, ffi_type_sint8)
+    hffi_TO_TYPE(HFFI_TYPE_UINT8, ffi_type_uint8)
+    hffi_TO_TYPE(HFFI_TYPE_SINT16, ffi_type_sint16)
+    hffi_TO_TYPE(HFFI_TYPE_UINT16, ffi_type_uint16)
+    hffi_TO_TYPE(HFFI_TYPE_UINT32, ffi_type_uint32)
+    hffi_TO_TYPE(HFFI_TYPE_SINT32, ffi_type_sint32)
+    hffi_TO_TYPE(HFFI_TYPE_INT, ffi_type_sint32)
+    hffi_TO_TYPE(HFFI_TYPE_UINT64, ffi_type_uint64)
+    hffi_TO_TYPE(HFFI_TYPE_SINT64, ffi_type_sint64)
+    hffi_TO_TYPE(HFFI_TYPE_FLOAT, ffi_type_float)
+    hffi_TO_TYPE(HFFI_TYPE_DOUBLE, ffi_type_double)
+    hffi_TO_TYPE(HFFI_TYPE_VOID, ffi_type_void)
     }
 //#undef hffi_TO_TYPE
     if(msg){
@@ -541,35 +541,31 @@ case ffi_t:{\
     DEF_HFFI_BASE_SWITCH(DEF_hffi_value_set_any_impl2, val->pointer_base_type)
     if(ffi_t == HFFI_TYPE_STRUCT){
        hffi_struct* hstru = hffi_value_get_struct(val);
-       if(hstru == NULL){
-           return HFFI_STATE_FAILED;
+       if(hstru != NULL){
+           hffi_struct_set_all(hstru, *((void**)val_ptr));
+           return HFFI_STATE_OK;
        }
-       hffi_struct_set_all(hstru, *((void**)val_ptr));
-       return HFFI_STATE_OK;
     }
     if(ffi_t == HFFI_TYPE_HARRAY){
         harray* hstru = hffi_value_get_harray(val);
-        if(hstru == NULL){
-            return HFFI_STATE_FAILED;
+        if(hstru != NULL){
+            harray_set_all(hstru, *(void**)val_ptr);
+            return HFFI_STATE_OK;
         }
-        harray_set_all(hstru, *(void**)val_ptr);
-        return HFFI_STATE_OK;
     }
     if(ffi_t == HFFI_TYPE_POINTER){
         if(val->pointer_base_type == HFFI_TYPE_HARRAY){
             harray* hstru = hffi_value_get_harray(val);
-            if(hstru == NULL){
-                return HFFI_STATE_FAILED;
+            if(hstru != NULL){
+                harray_set_all(hstru, ((void**)val_ptr)[0]);
+                return HFFI_STATE_OK;
             }
-            harray_set_all(hstru, ((void**)val_ptr)[0]);
-            return HFFI_STATE_OK;
         }else if(val->pointer_base_type == HFFI_TYPE_STRUCT){
             hffi_struct* hstru = hffi_value_get_struct(val);
-            if(hstru == NULL){
-                return HFFI_STATE_FAILED;
+            if(hstru != NULL){
+                hffi_struct_set_all(hstru, ((void**)val_ptr)[0]);
+                return HFFI_STATE_OK;
             }
-            hffi_struct_set_all(hstru, ((void**)val_ptr)[0]);
-            return HFFI_STATE_OK;
         }
     }
     return HFFI_STATE_FAILED;
@@ -989,8 +985,8 @@ static inline hffi_struct* hffi_new_struct_from_list0(int abi,struct array_list*
         }
         goto failed;
     }
-    //compute total size after align. make total_size align of 8?
-    int total_size = offsets[count  - 1] +  type->elements[count  - 1]->size;//TODO need align?
+    //after call 'ffi_get_struct_offsets' , size now is ensured
+    int total_size = type->size;
 
     //create hffi_struct to manage struct.
     hffi_struct* ptr = MALLOC(sizeof(hffi_struct));
@@ -1306,8 +1302,9 @@ struct harray* hffi_struct_get_harray(hffi_struct* hs, int index){
 int hffi_struct_get_base(hffi_struct* hs, int index, sint8 target_hffi, void* ptr){
 
 #define DEF__struct_get_base(ffi_t, type)\
-    case ffi_t:{\
+case ffi_t:{\
     *((type*)ptr) = ((type*)data_ptr)[0];\
+    printf("hffi_struct_get_base: val = %d\n", ((type*)data_ptr)[0]);\
     return HFFI_STATE_OK;\
 }break;
 

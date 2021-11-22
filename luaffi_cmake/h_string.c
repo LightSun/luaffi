@@ -51,7 +51,7 @@ hstring* hstring_append(hstring* owner, const char *str){
     owner->total_len += len;
     return owner;
 }
-#define HSTRING_BUF_LEN 256
+#define HSTRING_BUF_LEN 128
 hstring* hstring_appendf(hstring* owner, const char *format ,...){
     if (format == NULL) {
         printf("wrong format\n");

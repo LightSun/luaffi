@@ -42,4 +42,6 @@ void hlua_share_light_uservalue(lua_State* L, int tab_old, int tab_new);
 void* hlua_get_light_uservalue(lua_State* L, int tab_index);
 void hlua_delete_light_uservalue(lua_State* L, int tab_index);
 
+int hlua_get_struct_member_index(lua_State* L, int tab_index, int count, const char* in_name);
+
 #endif // LUA_UTIL_H

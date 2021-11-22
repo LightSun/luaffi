@@ -9,12 +9,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 SET(gTest_enabled true)
 if(gTest_enabled)
     #work
-    #include_directories(D:/study/github/thirds/googletest-release-1.11.0/googletest/include)
-    #set(gTest_lib_dir D:/study/github/thirds/googletest-release-1.11.0/googletest/build_out)
+    include_directories(D:/study/github/thirds/googletest-release-1.11.0/googletest/include)
+    set(gTest_lib_dir D:/study/github/thirds/googletest-release-1.11.0/googletest/build_out)
 
     #home
-    include_directories(D:/study/google/googletest-release-1.11.0/googletest/include)
-    SET(gTest_lib_dir D:/study/google/googletest-release-1.11.0/build_out/x64_mingw)
+    #include_directories(D:/study/google/googletest-release-1.11.0/googletest/include)
+    #SET(gTest_lib_dir D:/study/google/googletest-release-1.11.0/build_out/x64_mingw)
 
     #link_directories(${gTest_lib_dir}/release/libgtest.a)
     #set(gTest_libs gtest)

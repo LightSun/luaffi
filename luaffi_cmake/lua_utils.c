@@ -10,44 +10,48 @@ struct HDataWrapper{
 };
 
 int hlua_get_ref(lua_State* L, int tab_id, const char* key, int t){
+    tab_id = HLUA_ADJUST_ID(tab_id);
     int ref_ctx = LUA_NOREF;
     if(lua_getfield(L, tab_id, key) != LUA_TNIL){
         ref_ctx = luaL_ref(L, t);
         lua_pushnil(L);
-        lua_setfield(L, HLUA_ADJUST_ID(tab_id), key);
+        lua_setfield(L, tab_id, key);
     }
     lua_pop(L, 1);
     return ref_ctx;
 }
 
-int hlua_get_int(lua_State* L, int idx, const char* key, int def_val){
-    int t = lua_getfield(L, idx, key);
+int hlua_get_int(lua_State* L, int tab_id, const char* key, int def_val){
+    tab_id = HLUA_ADJUST_ID(tab_id);
+    int t = lua_getfield(L, tab_id, key);
     if(t == LUA_TNUMBER){
         def_val = luaL_checkinteger(L, -1);
         lua_pushnil(L);
-        lua_setfield(L, HLUA_ADJUST_ID(idx), key);
+        lua_setfield(L, tab_id, key);
     }
     lua_pop(L, 1);
     return def_val;
 }
 
-int hlua_get_number(lua_State* L, int idx, const char* key, lua_Number def_val){
-    int t = lua_getfield(L, idx, key);
+int hlua_get_number(lua_State* L, int tab_id, const char* key, lua_Number def_val){
+    tab_id = HLUA_ADJUST_ID(tab_id);
+    int t = lua_getfield(L, tab_id, key);
     if(t == LUA_TNUMBER){
         def_val = lua_tonumber(L, -1);
         lua_pushnil(L);
-        lua_setfield(L, HLUA_ADJUST_ID(idx), key);
+        lua_setfield(L, tab_id, key);
     }
     lua_pop(L, 1);
     return def_val;
 }
 
-int hlua_get_boolean(lua_State* L, int idx, const char* key, int def_val){
-    int t = lua_getfield(L, idx, key);
+int hlua_get_boolean(lua_State* L, int tab_id, const char* key, int def_val){
+    tab_id = HLUA_ADJUST_ID(tab_id);
+    int t = lua_getfield(L, tab_id, key);
     if(t == LUA_TNUMBER){
         def_val = lua_toboolean(L, -1);
         lua_pushnil(L);
-        lua_setfield(L, HLUA_ADJUST_ID(idx), key);
+        lua_setfield(L, tab_id, key);
     }
     lua_pop(L, 1);
     return def_val;
@@ -91,6 +95,7 @@ void hlua_push_light_uservalue(lua_State* L, int tab_idx, void* ud, Fun_delete d
 }
 void* hlua_get_light_uservalue(lua_State* L, int tab_index){
     if(lua_getuservalue(L, tab_index) == LUA_TNIL){
+        lua_pop(L, 1);
         return NULL;
     }
     struct HDataWrapper* w = (struct HDataWrapper*)lua_touserdata(L, -1);
@@ -99,6 +104,7 @@ void* hlua_get_light_uservalue(lua_State* L, int tab_index){
 }
 void hlua_delete_light_uservalue(lua_State* L, int tab_index){
     if(lua_getuservalue(L, tab_index) == LUA_TNIL){
+        lua_pop(L, 1);
         return;
     }
     struct HDataWrapper* w = (struct HDataWrapper*)lua_touserdata(L, -1);
@@ -111,12 +117,28 @@ void hlua_delete_light_uservalue(lua_State* L, int tab_index){
 
 void hlua_share_light_uservalue(lua_State* L, int tab_old, int tab_new){
     if(lua_getuservalue(L, tab_old) == LUA_TNIL){
+        lua_pop(L, 1);
         return;
     }
     struct HDataWrapper* w = (struct HDataWrapper*)lua_touserdata(L, -1);
     atomic_add(&w->ref, 1);
     lua_setuservalue(L, tab_new);
 }
+int hlua_get_struct_member_index(lua_State* L, int tab_index, int count, const char* in_name){
+    array_list* sm_names = (array_list*)hlua_get_light_uservalue(L, tab_index);
+    int index = -1;
+    char* tmp_name;
+    for(int i = count - 1 ; i >= 0 ; i --){
+        tmp_name = array_list_get(sm_names, i);
+        if(tmp_name != NULL && strcmp((char*)tmp_name, in_name) == 0){
+            index = i;
+            break;
+        }
+    }
+    return index;
+}
+
+//---------------------------------------------
 
 #define CHECK_NEXT_ASPTR()\
 if(lua_rawgeti(L, 1, i + 2) == LUA_TBOOLEAN){\
@@ -189,8 +211,8 @@ harray* hlua_new_harray_from_table(lua_State* L, int idx, Func_get_ptr_struct fu
     if(lua_type(L, idx + 1) == LUA_TTABLE){
         len = hlua_get_int(L, idx + 1, "len", len);
         base_type = (sint8)hlua_get_int(L, idx + 1, "type", base_type);
-        asPtr = hlua_get_boolean(L, idx + 1, "asPtr", asPtr);
-        has_data = hlua_get_boolean(L, idx + 1, "has_data", asPtr);
+        asPtr = hlua_get_boolean(L, idx + 1, "asptr", asPtr);
+        has_data = !hlua_get_boolean(L, idx + 1, "nodata", 0);
     }
 
     int count = lua_rawlen(L, idx);
