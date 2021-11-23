@@ -115,7 +115,7 @@ macro(HFFI_TYPE_SINT32, sint32, "%d")\
 macro(HFFI_TYPE_UINT32, uint32, "%u")\
 macro(HFFI_TYPE_SINT64, sint64, "%lld")\
 macro(HFFI_TYPE_UINT64, uint64, "%llu")\
-macro(HFFI_TYPE_INT, sint32, "%d")\
+macro(HFFI_TYPE_INT, int, "%d")\
 macro(HFFI_TYPE_FLOAT, float, "%g")\
 macro(HFFI_TYPE_DOUBLE, double, "%g")\
 }
@@ -161,5 +161,6 @@ int hffi_struct_set_all(struct hffi_struct* c, void* ptr);
 struct hffi_struct* hffi_struct_copy(struct hffi_struct* src);
 int hffi_struct_eq(struct hffi_struct* hs1, struct hffi_struct* hs2);
 void hffi_struct_dump(struct hffi_struct* arr, struct hstring* hs);
+int hffi_base_type_size(sint8 hffi_t);
 
 #endif // HFFI_COMMON_H

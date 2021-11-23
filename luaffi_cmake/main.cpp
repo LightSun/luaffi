@@ -14,6 +14,8 @@ void testClosure();
 void testClosure2();
 void testClosure3();
 
+void test_dymlib();
+
 void hffi_test1();
 void hffi_test2();
 void hffi_test_struct();
@@ -62,6 +64,8 @@ static void test_ffi_all(){
     hffi_test_struct3();
     test_call_unions();
     hffi_test_value1(0, NULL);
+
+    test_dymlib();
 }
 //int argc,char **argv
 extern "C" int main()

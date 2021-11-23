@@ -165,6 +165,7 @@ struct harray* hffi_value_get_pointer_as_array(hffi_value* val, int rows, int co
 int hffi_value_set_any(hffi_value* val, void* val_ptr);
 //--------- for test ----------
 int hffi_value_set_base(hffi_value* val, void* in_ptr);
+void hffi_value_dump(hffi_value* val, struct hstring* buf);
 
 /**
  * @brief hffi_call: do call ffi.

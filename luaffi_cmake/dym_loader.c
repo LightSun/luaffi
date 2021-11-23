@@ -128,6 +128,7 @@ dym_lib* dym_new_lib(const char* libname){
 }
 
 static void __func_release(void* ud, void* data){
+    (void)ud;
     dym_func* func = data;
     FREE(func->name);
     FREE(func);

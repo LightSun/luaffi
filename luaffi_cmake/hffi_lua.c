@@ -68,7 +68,7 @@ static const BasePair _BASE_PAIRS[] = {
     {"bool", HFFI_TYPE_SINT8},
     {"short", HFFI_TYPE_SINT16},
     {"long", HFFI_TYPE_SINT64},
-    {"int", HFFI_TYPE_SINT32},
+    {"int", HFFI_TYPE_INT},
     {"uint", HFFI_TYPE_UINT32},
     //----- internal types -------
     {"array", HFFI_TYPE_HARRAY},
@@ -807,10 +807,10 @@ static int xffi_value_new(lua_State *L){
         }else{
             if(lua_gettop(L) >= 2){ //hasVal = 1;
                 if(type == HFFI_TYPE_FLOAT || type == HFFI_TYPE_DOUBLE){
-                    lua_Number num = lua_tonumber(L, 3);
+                    lua_Number num = lua_tonumber(L, 2);
                     val = hffi_new_value_raw_type2(type, &num);
                 }else{
-                    lua_Integer num = lua_tointeger(L, 3);
+                    lua_Integer num = lua_tointeger(L, 2);
                     val = hffi_new_value_raw_type2(type, &num);
                 }
             }else{
@@ -927,10 +927,19 @@ static int xffi_value_index(lua_State *L){
     }
     return 0;
 }
+static int xffi_value_tostring(lua_State *L){
+    hffi_value* val = get_ptr_hffi_value(L, 1);
+    hstring* hs = hstring_new();
+    hffi_value_dump(val, hs);
+    lua_pushstring(L, hstring_tostring(hs));
+    hstring_delete(hs);
+    return 1;
+}
 
 static const luaL_Reg g_hffi_value_Methods[] = {
     {"__gc", xffi_value_gc},
     {"__index", xffi_value_index},
+    {"__tostring", xffi_value_tostring},
     {NULL, NULL}
 };
 //------------------- dym_func ------------
@@ -1031,6 +1040,9 @@ static const luaL_Reg g_dym_lib_Methods[] = {
 static int xffi_dym_lib_new(lua_State *L){
     luaL_checktype(L, -1, LUA_TSTRING);
     dym_lib* lib = dym_new_lib(luaL_checkstring(L, -1));
+    if(lib == NULL){
+        return luaL_error(L, "load lib failed.");
+    }
     push_ptr_dym_lib(L, lib);
     lua_pushvalue(L, -2);      // str, lib, str
     lua_setuservalue(L, -2);   // str, lib
@@ -1051,7 +1063,7 @@ static const luaL_Reg g_hffi_cif_Methods[] = {
 
 static inline hffi_value* __get_value(lua_State *L, int idx){
     if(lua_type(L, idx) == LUA_TNUMBER){
-        return hffi_new_value_raw_type(luaL_checkinteger(L, idx));
+        return hffi_new_value_raw_type((sint8)luaL_checkinteger(L, idx));
     }else if(luaL_testudata(L, idx, __STR(hffi_struct)) != 0){
         hffi_struct* _struct = get_ptr_hffi_struct(L, idx);
         return hffi_new_value_struct(_struct);

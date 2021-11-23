@@ -10,7 +10,7 @@
 
 #define hffi_new_value_auto_x(ffi_t,type) \
 hffi_value* hffi_new_value_##type(type val){\
-    hffi_value* v = hffi_new_value(ffi_t, HFFI_TYPE_VOID,sizeof(type*));\
+    hffi_value* v = hffi_new_value(ffi_t, HFFI_TYPE_VOID, sizeof(type*));\
     type* p = (type*)v->ptr;\
     *p = val;\
     return v;\
@@ -25,18 +25,19 @@ int hffi_value_get_##t(hffi_value* val, t* out_ptr){\
     if(ft != NULL && ft->size >= sizeof(t)){\
        if(ft->size >= sizeof(t)){\
           *out_ptr = *((t*)val->ptr);\
-          return 0;\
+          return HFFI_STATE_OK;\
        }else{\
           strcpy(*msg, "wrong value type.");\
        }\
     }\
-    return 1;\
+    return HFFI_STATE_FAILED;\
 }
 
 #define DEF_NEW_VALUE_RAW(ffi_t, type)\
 case ffi_t:{\
     hffi_value* hv = hffi_new_value(ffi_t, HFFI_TYPE_VOID, sizeof (type*));\
     *((type*)hv->ptr) = *((type*)val_ptr);\
+    printf("hffi_new_value_raw_type2: ptr = %d, val = %d\n", hv->ptr, *((type*)hv->ptr));\
     return hv;\
 }break;
 
@@ -303,6 +304,7 @@ hffi_value* hffi_new_value(sint8 hffi_t, sint8 hffi_t2, int size){
     val_ptr->base_ffi_type = hffi_t;
     val_ptr->pointer_base_type = hffi_t2;
     val_ptr->ref = 1;   
+    memset(val_ptr->ptr, 0, size);
     return val_ptr;
 }
 hffi_value* hffi_new_value_ptr_nodata(sint8 hffi_t2){
@@ -350,12 +352,9 @@ hffi_value* hffi_new_value_ptr2(sint8 ffi_t, void* val_ptr){
 }
 
 hffi_value* hffi_new_value_raw_type(sint8 ffi_t){
-//    int size = 0;
-//    switch (ffi_t) {
-//    case HFFI_TYPE_SINT8:{size = sizeof (sint8);}break;
-//    }
-   // return hffi_new_value(ffi_t, HFFI_TYPE_VOID, size);
-    return hffi_new_value(ffi_t, HFFI_TYPE_VOID, sizeof(void*));
+    return hffi_new_value(ffi_t, HFFI_TYPE_VOID,
+                          sizeof (void*)//hffi_base_type_size(ffi_t)
+                          );
 }
 hffi_value* hffi_new_value_struct(hffi_struct* c){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
@@ -605,6 +604,67 @@ harray* hffi_value_get_harray(hffi_value* val){
 /** continueMemory: sometimes, some memory malloc split for array-array. */
 harray* hffi_value_get_pointer_as_array(hffi_value* val, int rows, int cols,int continue_mem, int share_memory){
     return hffi_get_pointer_as_array_impl(val->pointer_base_type, val->ptr, rows, cols, continue_mem, share_memory);
+}
+
+void hffi_value_dump(hffi_value* val, struct hstring* hs){
+    if(val->ptr == NULL){
+        return;
+    }
+    int a = 0;
+    hffi_value_get_int(val, &a);
+    printf("hffi_value_dump 1: %d\n", a);
+
+#define DEF_hffi_value_dump_IMPL(ffi_t, type, format)\
+case ffi_t:{\
+    hstring_appendf(hs, format, *((type*)val->ptr));\
+    printf("hffi_value_dump 2: %d\n", *((type*)val->ptr));\
+    return;\
+}break;
+    int ffi_t = val->base_ffi_type;
+    if(ffi_t == HFFI_TYPE_POINTER){
+        ffi_t = val->pointer_base_type;
+    }
+    DEF_HFFI_SWITCH_BASE_FORMAT(DEF_hffi_value_dump_IMPL, ffi_t);
+    switch (val->base_ffi_type) {
+        case HFFI_TYPE_HARRAY:{
+            hstring_append(hs, "<array> ");
+            harray* harr = hffi_value_get_harray(val);
+            harray_dump(harr, hs);
+        }break;
+        case HFFI_TYPE_HARRAY_PTR:{
+            hstring_append(hs, "<array_ptr> ");
+            harray* harr = hffi_value_get_harray(val);
+            harray_dump(harr, hs);
+        }break;
+        case HFFI_TYPE_STRUCT:{
+            hstring_append(hs, "<struct> ");
+            hffi_struct* child_hs = hffi_value_get_struct(val);
+            hffi_struct_dump(child_hs, hs);
+        }break;
+        case HFFI_TYPE_STRUCT_PTR:{
+            hstring_append(hs, "<struct_ptr> ");
+            hffi_struct* child_hs = hffi_value_get_struct(val);
+            hffi_struct_dump(child_hs, hs);
+        }break;
+
+        case HFFI_TYPE_POINTER:{
+            if(val->pointer_base_type == HFFI_TYPE_HARRAY){
+                hstring_append(hs, "<array_ptr> ");
+                harray* harr = hffi_value_get_harray(val);
+                harray_dump(harr, hs);
+            }else if(val->pointer_base_type == HFFI_TYPE_STRUCT){
+                hstring_append(hs, "<struct_ptr> ");
+                hffi_struct* child_hs = hffi_value_get_struct(val);
+                hffi_struct_dump(child_hs, hs);
+            }else{
+                hstring_append(hs, "<pointer> ");
+                hstring_appendf(hs, "%p", val->ptr);
+            }
+        }break;
+        default:{
+            hstring_append(hs, "<unknown> ");
+        }break;
+    }
 }
 //----------------------------- ------------------------------
 static inline void* __get_data_ptr(hffi_value* v){
@@ -1550,7 +1610,7 @@ case hffi_t:{\
                 }break;
 
                 case HFFI_TYPE_POINTER:{
-                    hstring_append(hs, " \n<struct_ptr> ");
+                    hstring_append(hs, " \n<pointer> ");
                     hstring_appendf(hs, "%p", arr->data + offsets[i]);
                 }break;
                 default:{
@@ -1747,6 +1807,15 @@ hffi_cif* hffi_new_cif(int abi,array_list* in_vals, int var_count,hffi_value* ou
         args = MALLOC(sizeof(void *) *in_count);
         for(int i = 0 ; i < in_count ; i ++){
             val = array_list_get(in_vals, i);
+
+//            int out = 0;
+//            if(i == 0){
+//                hffi_value_get_sint8(val, &out);
+//            }else{
+//                hffi_value_get_int(val, &out);
+//            }
+//            printf("input %d: %d\n", i, out);
+
             argTypes[i] = hffi_value_get_rawtype(val, msg);
             if(argTypes[i] == NULL){
                 goto failed;
