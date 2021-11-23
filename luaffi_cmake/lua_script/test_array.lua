@@ -26,6 +26,10 @@ arr.set(1, {5, 6})
 assert(arr[1]==5)
 assert(arr[2]==6)
 
+arr[N] = 100
+assert(arr[0]==100)
+assert(arr[1]==100)
+assert(arr[2]==100)
 
 
 print("gc: ",collectgarbage("count"))

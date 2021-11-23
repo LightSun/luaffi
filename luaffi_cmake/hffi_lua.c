@@ -9,6 +9,8 @@
 
 #include "lua_utils.h"
 
+#define __N_VAL INT_MIN
+
 #define REG_CLASS(L, C)                             \
     do {                                            \
         luaL_newmetatable(L, __STR(C));      \
@@ -193,6 +195,13 @@ static int xffi_harray_newindex(lua_State* L){
     //tab, i, val(single or table)
     harray* arr = get_ptr_harray(L, -3);
     int index = luaL_checkinteger(L, -2);
+    //check if is N. set all element to it.
+    if(index == __N_VAL){
+        for(int i = 0 ; i < arr->ele_count ; i ++){
+            __harray_set_vals(L, arr, i);
+        }
+        return 0;
+    }
     if(index < 0) index = arr->ele_count + index;
     if(lua_type(L, -1) == LUA_TTABLE){
         int c = lua_rawlen(L, -1);
@@ -1338,6 +1347,8 @@ static int xffi_defines(lua_State *L){
         reg_t(lib->name, lib->type);
     }
 #undef reg_t
+    lua_pushinteger(L, __N_VAL);
+    lua_setglobal(L, "N");
     return 0;
 }
 
@@ -1351,6 +1362,8 @@ static int xffi_undefines(lua_State *L){
         unreg_t(lib->name);
     }
 #undef unreg_t
+    lua_pushnil(L);
+    lua_setglobal(L, "N");
     return 0;
 }
 static int xffi_typeStr(lua_State *L){
