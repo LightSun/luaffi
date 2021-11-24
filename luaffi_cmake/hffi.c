@@ -10,7 +10,7 @@
 
 #define hffi_new_value_auto_x(ffi_t,type) \
 hffi_value* hffi_new_value_##type(type val){\
-    hffi_value* v = hffi_new_value(ffi_t, HFFI_TYPE_VOID, sizeof(type*));\
+    hffi_value* v = hffi_new_value(ffi_t, HFFI_TYPE_VOID, sizeof(type));\
     type* p = (type*)v->ptr;\
     *p = val;\
     return v;\
@@ -35,7 +35,7 @@ int hffi_value_get_##t(hffi_value* val, t* out_ptr){\
 
 #define DEF_NEW_VALUE_RAW(ffi_t, type)\
 case ffi_t:{\
-    hffi_value* hv = hffi_new_value(ffi_t, HFFI_TYPE_VOID, sizeof (type*));\
+    hffi_value* hv = hffi_new_value(ffi_t, HFFI_TYPE_VOID, sizeof (type));\
     *((type*)hv->ptr) = *((type*)val_ptr);\
     printf("hffi_new_value_raw_type2: ptr = %d, val = %d\n", hv->ptr, *((type*)hv->ptr));\
     return hv;\
@@ -353,7 +353,8 @@ hffi_value* hffi_new_value_ptr2(sint8 ffi_t, void* val_ptr){
 
 hffi_value* hffi_new_value_raw_type(sint8 ffi_t){
     return hffi_new_value(ffi_t, HFFI_TYPE_VOID,
-                          sizeof (void*)//hffi_base_type_size(ffi_t)
+                          //sizeof (void*)
+                          hffi_base_type_size(ffi_t)
                           );
 }
 hffi_value* hffi_new_value_struct(hffi_struct* c){
@@ -452,6 +453,7 @@ hffi_value* hffi_value_copy(hffi_value* val){
 void hffi_delete_value(hffi_value* val){
     int old = atomic_add(&val->ref, -1);
     if(old == 1){
+        printf("hffi_delete_value(will delete): addr = %p\n", val);
         //delete ptr
         switch (val->base_ffi_type) {
         case HFFI_TYPE_STRUCT:{
@@ -610,14 +612,10 @@ void hffi_value_dump(hffi_value* val, struct hstring* hs){
     if(val->ptr == NULL){
         return;
     }
-    int a = 0;
-    hffi_value_get_int(val, &a);
-    printf("hffi_value_dump 1: %d\n", a);
-
 #define DEF_hffi_value_dump_IMPL(ffi_t, type, format)\
 case ffi_t:{\
     hstring_appendf(hs, format, *((type*)val->ptr));\
-    printf("hffi_value_dump 2: %d\n", *((type*)val->ptr));\
+    printf("hffi_value_dump: %d\n", *((type*)val->ptr));\
     return;\
 }break;
     int ffi_t = val->base_ffi_type;
@@ -665,6 +663,10 @@ case ffi_t:{\
             hstring_append(hs, "<unknown> ");
         }break;
     }
+}
+void list_travel_value_dump(void* d, struct hstring* hs){
+    if(d) hffi_value_dump((hffi_value*)d, hs);
+    else hstring_append(hs, "null");
 }
 //----------------------------- ------------------------------
 static inline void* __get_data_ptr(hffi_value* v){
@@ -1885,7 +1887,21 @@ void hffi_delete_cif(hffi_cif* hcif){
     }
 }
 void hffi_cif_call(hffi_cif* hcif, void* fn){
+//    hstring* hs = hstring_new();
+//    hstring_append(hs, "before call inputs: \n");
+//    array_list_dump_values(hcif->in_vals, hs);
+//    hstring_append(hs, "\nbefore call out: \n");
+//    hffi_value_dump(hcif->out, hs);
+//    printf(hstring_tostring(hs));
+//    hstring_delete(hs);
     ffi_call(hcif->cif, fn, __get_data_ptr(hcif->out), hcif->args);
+//    hs = hstring_new();
+//    array_list_dump_values(hcif->in_vals, hs);
+//    hstring_append(hs, "after call inputs: \n");
+//    hstring_append(hs, "\nafter call out: \n");
+//    hffi_value_dump(hcif->out, hs);
+//    printf(hstring_tostring(hs));
+//    hstring_delete(hs);
 }
 hffi_value* hffi_cif_get_result_value(hffi_cif* hcif){
     return hcif->out;

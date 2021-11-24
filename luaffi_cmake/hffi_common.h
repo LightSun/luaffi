@@ -102,7 +102,7 @@ macro(HFFI_TYPE_SINT64, sint64)\
 macro(HFFI_TYPE_UINT64, uint64)\
 macro_f(HFFI_TYPE_FLOAT, float)\
 macro_f(HFFI_TYPE_DOUBLE, double)\
-macro(HFFI_TYPE_INT, sint32)\
+macro(HFFI_TYPE_INT, int)\
 }
 
 #define DEF_HFFI_SWITCH_BASE_FORMAT(macro, ffi_t)\
@@ -132,7 +132,7 @@ macro(HFFI_TYPE_SINT64, "sint64")\
 macro(HFFI_TYPE_UINT64, "uint64")\
 macro(HFFI_TYPE_FLOAT, "float")\
 macro(HFFI_TYPE_DOUBLE, "double")\
-macro(HFFI_TYPE_INT, "sint32")\
+macro(HFFI_TYPE_INT, "int")\
 macro(HFFI_TYPE_VOID, "void")\
 macro(HFFI_TYPE_HARRAY, "<array>")\
 macro(HFFI_TYPE_HARRAY_PTR, "<array_ptr>")\
@@ -143,6 +143,7 @@ macro(HFFI_TYPE_CLOSURE, "<closure>")\
 
 struct hffi_struct;
 struct hstring;
+struct array_list;
 
 void hffi_delete_struct(struct hffi_struct* c);
 
@@ -161,6 +162,11 @@ int hffi_struct_set_all(struct hffi_struct* c, void* ptr);
 struct hffi_struct* hffi_struct_copy(struct hffi_struct* src);
 int hffi_struct_eq(struct hffi_struct* hs1, struct hffi_struct* hs2);
 void hffi_struct_dump(struct hffi_struct* arr, struct hstring* hs);
+
+//-------------------------
+extern void list_travel_value_dump(void* d, struct hstring* hs);
 int hffi_base_type_size(sint8 hffi_t);
+void array_list_dump(struct array_list* list, struct hstring* hs, void(*func)(void* ele, struct hstring* hs));
+void array_list_dump_values(struct array_list* list, struct hstring* hs);
 
 #endif // HFFI_COMMON_H

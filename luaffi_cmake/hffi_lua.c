@@ -908,22 +908,21 @@ static int __hiff_value_get(lua_State *L){
     return 0;
 }
 static int __hiff_value_copy(lua_State *L){
-    hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
-    return push_ptr_hffi_value(L, hffi_value_copy(val));
+     hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
+     return push_ptr_hffi_value(L, hffi_value_copy(val));
 }
+static int __hiff_value_addr(lua_State *L){
+     hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
+     lua_pushfstring(L, "%p", (void*)val);
+     return 1;
+}
+
 static int xffi_value_index(lua_State *L){
     if(lua_type(L, 2) == LUA_TSTRING){
         const char* fun_name = lua_tostring(L, 2);
-        if(strcmp(fun_name, "copy") == 0){
-            lua_pushvalue(L, 1);
-            lua_pushcclosure(L, __hiff_value_copy, 1);
-            return 1;
-        }
-        if(strcmp(fun_name, "get") == 0){
-            lua_pushvalue(L, 1);
-            lua_pushcclosure(L, __hiff_value_get, 1);
-            return 1;
-        }
+        __INDEX_METHOD("copy", __hiff_value_copy);
+        __INDEX_METHOD("get", __hiff_value_get);
+        __INDEX_METHOD("addr", __hiff_value_addr);
     }
     return 0;
 }
@@ -978,16 +977,24 @@ static int __dym_func_bind(lua_State *L){
 static int __dym_func_call(lua_State *L){
     //cif
     int func_index = lua_upvalueindex(1);
-    dym_func* func = get_ptr_dym_func(L, func_index);
+    lua_pushvalue(L, func_index);
+    dym_func* func = get_ptr_dym_func(L, -1);
     hffi_cif* cif;
-    if(lua_gettop(L) == 1){
-        cif = get_ptr_hffi_cif(L, -1);
+    if(lua_gettop(L) >= 2){
+        cif = get_ptr_hffi_cif(L, -2);
     }else{
-        lua_getuservalue(L, func_index);
-        cif = get_ptr_hffi_cif(L, func_index);
+        lua_getuservalue(L, -1);
+        cif = get_ptr_hffi_cif(L, -1);
     }
     hffi_cif_call(cif, func->func_ptr);
 
+    //TODO debug
+    int v = 0;
+    if(hffi_value_get_int(cif->out, &v) == HFFI_STATE_OK){
+        printf("__dym_func_call result: %d\n", v);
+    }else{
+        printf("hffi_value_get_int failed! \n");
+    }
     hffi_value_ref(cif->out, 1);
     push_ptr_hffi_value(L, cif->out);
     return 1;

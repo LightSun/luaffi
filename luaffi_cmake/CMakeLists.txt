@@ -7,14 +7,23 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 #cmake can build gTest
 SET(gTest_enabled true)
+#SET(ext_libffi true)
+
+if(ext_libffi)
+    include_directories(E:/study/tools/libffi-3.4.2/x86_64-w64-mingw32/include)
+    set(ffi_libs E:/study/tools/libffi-3.4.2/x86_64-w64-mingw32/.libs/libffi.a)
+else(ext_libffi)
+    set(ffi_libs ffi)
+endif(ext_libffi)
+
 if(gTest_enabled)
     #work
-    #include_directories(D:/study/github/thirds/googletest-release-1.11.0/googletest/include)
-    #set(gTest_lib_dir D:/study/github/thirds/googletest-release-1.11.0/googletest/build_out)
+    include_directories(D:/study/github/thirds/googletest-release-1.11.0/googletest/include)
+    set(gTest_lib_dir D:/study/github/thirds/googletest-release-1.11.0/googletest/build_out)
 
     #home
-    include_directories(D:/study/google/googletest-release-1.11.0/googletest/include)
-    SET(gTest_lib_dir D:/study/google/googletest-release-1.11.0/build_out/x64_mingw)
+    #include_directories(D:/study/google/googletest-release-1.11.0/googletest/include)
+    #SET(gTest_lib_dir D:/study/google/googletest-release-1.11.0/build_out/x64_mingw)
 
     #link_directories(${gTest_lib_dir}/release/libgtest.a)
     #set(gTest_libs gtest)
@@ -74,13 +83,13 @@ add_executable(luaffi_app
     ${SRC_HFFI}
     )
 
-target_link_libraries(ffi2 lua ffi)
+target_link_libraries(ffi2 lua ${ffi_libs})
 target_link_libraries(luaffi_app ffi2 lua)
 if(gTest_enabled)
     target_link_libraries(luaffi_app ${gTest_libs})
 endif()
 #target_compile_definitions(luaffi_app PRIVATE X86_WIN64)
-add_compile_definitions(X86_WIN64)
+#add_compile_definitions(X86_64)
 
 #--------- add test lib ------
 add_library(test_hffi SHARED libtest.c)
