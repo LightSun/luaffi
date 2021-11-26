@@ -40,7 +40,6 @@ DEF_HFFI_PUSH_GET(dym_lib)
 DEF_HFFI_PUSH_GET(dym_func)
 DEF_HFFI_PUSH_GET(hffi_value)
 DEF_HFFI_PUSH_GET(hffi_struct)
-DEF_HFFI_PUSH_GET(hffi_cif)
 DEF_HFFI_PUSH_GET(hffi_smtype)
 DEF_HFFI_PUSH_GET(harray)
 DEF_HFFI_PUSH_GET(hffi_closure)
@@ -105,6 +104,7 @@ for(int i = count - 1 ; i >= 0 ; i --){\
 static void string_delete(void* d){
     if(d) FREE(d);
 }
+static hffi_value* __get_value(lua_State *L, int idx);
 //------------------- harray --------------------
 
 #define _harray_index_impl_int(hffi_t, type)\
@@ -948,62 +948,71 @@ static int xffi_dym_func_gc(lua_State *L){
     dym_delete_func(func);
     return 0;
 }
-#define VAL_TO_LUA_RESULT(ft, t)\
-case ft:{\
-    t val;\
-    hffi_value_get_##t(cif->out, &val);\
-    lua_pushinteger(L, val);\
-    return 1;\
-}break;
 
-#define VAL_TO_LUA_RESULT_F(ft, t)\
-case ft:{\
-    t val;\
-    hffi_value_get_##t(cif->out, &val);\
-    lua_pushnumber(L, val);\
-    return 1;\
-}break;
-
-static int __dym_func_bind(lua_State *L){
-    //cif
-    int func_index = lua_upvalueindex(1);
-    if(lua_gettop(L) == 0) return 0;
-    luaL_checkudata(L, 1, __STR(hffi_cif));
-    lua_setuservalue(L, func_index);
-    lua_pushvalue(L, func_index);
-    return 1;
-}
-
-static int __dym_func_call(lua_State *L){
-    //cif
-    int func_index = lua_upvalueindex(1);
-    lua_pushvalue(L, func_index);
-    dym_func* func = get_ptr_dym_func(L, -1);
-    hffi_cif* cif;
-    if(lua_gettop(L) >= 2){
-        cif = get_ptr_hffi_cif(L, -2);
-    }else{
-        lua_getuservalue(L, -1);
-        cif = get_ptr_hffi_cif(L, -1);
+/** as ffi can't use like this:
+1, create a cif to hold some cif info. and latter to call.
+*/
+static int xffi_dym_func_call(lua_State* L){
+    dym_func* func = get_ptr_dym_func(L, lua_upvalueindex(1));
+    //ret_type, tab_param_types.
+    luaL_checktype(L, 1, LUA_TTABLE);
+    int len = lua_rawlen(L, 1);
+    //abi
+    int abi = FFI_DEFAULT_ABI;
+    abi = hlua_get_int(L, 1, "abi", abi);
+    //var count
+    int var_count = 0;
+    var_count = hlua_get_int(L, 1, "var_count", var_count);
+    if(var_count > len){
+        return luaL_error(L, "var count can't bigger than total parameter count.");
     }
-    hffi_cif_call(cif, func->func_ptr);
-
-    //TODO debug
-    int v = 0;
-    if(hffi_value_get_int(cif->out, &v) == HFFI_STATE_OK){
-        printf("__dym_func_call result: %d\n", v);
+    //ret
+    hffi_value* ret_val;
+    if(lua_getfield(L, 1, "ret") != LUA_TNIL){
+        ret_val = __get_value(L, -1);
+        if(ret_val == NULL){
+             return luaL_error(L, "ret: unsupport cif type. type must be (sint8,hffi_struct,hffi_value)");
+        }
+        lua_pushnil(L);
+        lua_setfield(L, 1, "ret");
     }else{
-        printf("hffi_value_get_int failed! \n");
+        ret_val = hffi_new_value_raw_type(HFFI_TYPE_VOID);
     }
-    hffi_value_ref(cif->out, 1);
-    push_ptr_hffi_value(L, cif->out);
+    lua_pop(L, 1);//pop ret.
+    //params
+    hffi_value* val;
+    array_list* params = array_list_new(12, 0.75f);
+    for(int i = 0 ;i < len ; i ++){
+        lua_rawgeti(L, 1, i+1);
+        //type: int, struct, value?
+        val = __get_value(L, -1);
+        if(val != NULL){
+            array_list_add(params, val);
+        }else{
+            array_list_delete2(params, list_travel_value_delete);
+            hffi_delete_value(ret_val);
+            return luaL_error(L, "params(index = %d): unsupport type. type must be (sint8,hffi_struct,hffi_value)", i);
+        }
+        lua_pop(L, 1);
+    }
+    //prepare cif and call
+    char _m[128];
+    char* msg[1];
+    msg[0] = _m;
+    if(hffi_call_from_list(abi, func->func_ptr, params, var_count, ret_val, msg) == HFFI_STATE_FAILED){
+        array_list_delete2(params, list_travel_value_delete);
+        hffi_delete_value(ret_val);
+        return luaL_error(L, "%s", msg[0]);
+    }
+    array_list_delete2(params, list_travel_value_delete);
+   // hffi_value_ref(ret_val, 1); //already add ref.
+    push_ptr_hffi_value(L, ret_val);
     return 1;
 }
 int xffi_dym_func_index(lua_State* L){
     if(lua_type(L, 2) == LUA_TSTRING){
         const char* fun_name = lua_tostring(L, 2);
-        __INDEX_METHOD("call", __dym_func_call)
-        __INDEX_METHOD("bind", __dym_func_bind)
+        __INDEX_METHOD("call", xffi_dym_func_call)
         return luaL_error(L, "unsupport method('%s') for smtype.", fun_name);
     }
     return 0;
@@ -1055,19 +1064,7 @@ static int xffi_dym_lib_new(lua_State *L){
     lua_setuservalue(L, -2);   // str, lib
     return 1;
 }
-//--------------------- cif -------------------
-
-static int xffi_cif_gc(lua_State *L){
-    hffi_cif* cif = get_ptr_hffi_cif(L, 1);
-    hffi_delete_cif(cif);
-    return 0;
-}
-
-static const luaL_Reg g_hffi_cif_Methods[] = {
-    {"__gc", xffi_cif_gc},
-    {NULL, NULL}
-};
-
+//---------------------  -------------------
 static inline hffi_value* __get_value(lua_State *L, int idx){
     if(lua_type(L, idx) == LUA_TNUMBER){
         return hffi_new_value_raw_type((sint8)luaL_checkinteger(L, idx));
@@ -1087,65 +1084,6 @@ static inline hffi_value* __get_value(lua_State *L, int idx){
     else{
         return NULL;
     }
-}
-//cif { ret = pointer; pointer, sint, uint32 }
-static int xffi_cif(lua_State *L){
-    //ret_type, tab_param_types.
-    luaL_checktype(L, 1, LUA_TTABLE);
-    int len = lua_rawlen(L, 1);
-    //abi
-    int abi = FFI_DEFAULT_ABI;
-    abi = hlua_get_int(L, 1, "abi", abi);
-    //var count
-    int var_count = 0;
-    var_count = hlua_get_int(L, 1, "var_count", var_count);
-    if(var_count > len){
-        return luaL_error(L, "var count can't bigger than total parameter count.");
-    }
-    //ret
-    hffi_value* ret_val;
-    if(lua_getfield(L, 1, "ret") != LUA_TNIL){
-        ret_val = __get_value(L, -1);
-        if(ret_val == NULL){
-             return luaL_error(L, "unsupport cif type. type must be (sint8,hffi_struct,hffi_value)");
-        }
-        lua_pushnil(L);
-        lua_setfield(L, 1, "ret");
-    }else{
-        ret_val = hffi_new_value_raw_type(HFFI_TYPE_VOID);
-    }
-    lua_pop(L, 1);//pop ret.
-    //params
-    hffi_value* val;
-    array_list* params = array_list_new(12, 0.75f);
-    for(int i = 0 ;i < len ; i ++){
-        lua_rawgeti(L, 1, i+1);
-        //type: int, struct, value?
-        val = __get_value(L, -1);
-        if(val != NULL){
-            array_list_add(params, val);
-        }else{
-            array_list_delete2(params, list_travel_value_delete);
-            hffi_delete_value(ret_val);
-            return luaL_error(L, "unsupport cif type. type must be (sint8,hffi_struct,hffi_value)");
-        }
-        lua_pop(L, 1);
-    }
-    //build cif
-    char _m[128];
-    char* msg[1];
-    msg[0] = _m;
-    hffi_cif* cif = hffi_new_cif(abi, params, var_count, ret_val, msg);
-    if(cif == NULL){
-        array_list_delete2(params, list_travel_value_delete);
-        hffi_delete_value(ret_val);
-        return luaL_error(L, "%s", msg[0]);
-    }
-    //de-ref
-    array_list_delete2(params, list_travel_value_delete);
-    hffi_delete_value(ret_val);
-    push_ptr_hffi_cif(L, cif);
-    return 1;
 }
 //------------------- closure ----------------------
 #define HLUA_REF_ID_FUNC LUA_REGISTRYINDEX
@@ -1408,7 +1346,6 @@ LUAMOD_API void register_ffi(lua_State *L){
     REG_CLASS(L, dym_func);
     REG_CLASS(L, hffi_value);
     REG_CLASS(L, hffi_struct);
-    REG_CLASS(L, hffi_cif);
     REG_CLASS(L, hffi_smtype);
     REG_CLASS(L, harray);
     REG_CLASS(L, hffi_closure);
@@ -1422,7 +1359,6 @@ LUAMOD_API void register_ffi(lua_State *L){
     setfield_function(L, "typestr", xffi_typeStr);
 
     setfield_function(L, "loadLib", xffi_dym_lib_new);
-    setfield_function(L, "cif", xffi_cif);
     setfield_function(L, "value", xffi_value_new);
     setfield_function(L, "array", xffi_harray_new);
     setfield_function(L, "struct", xffi_struct_new);

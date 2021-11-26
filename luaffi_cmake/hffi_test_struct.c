@@ -54,7 +54,7 @@ void hffi_test_struct(){
     hffi_value* input[2];
     input[0] = param1;
     input[1] = NULL;
-    if(hffi_call(fn, input, retVal, msg) == HFFI_STATE_OK){
+    if(hffi_call(fn, input, 0, retVal, msg) == HFFI_STATE_OK){
         printf("test call 'Test_struct1 method_struct(Test_struct1 s)' success.\n");
         hffi_struct* ret_s = hffi_value_get_struct(retVal);
         Test_struct1* ts1 = ret_s->data;
@@ -112,7 +112,7 @@ void hffi_test_struct2(){
     hffi_value* input[2];
     input[0] = param1;
     input[1] = NULL;
-    if(hffi_call(fn, input, retVal, msg) == HFFI_STATE_OK){
+    if(hffi_call(fn, input, 0, retVal, msg) == HFFI_STATE_OK){
         printf("test call 'Test_struct1 method_struct(Test_struct1* s)' success.\n");
         hffi_struct* param_s = hffi_value_get_struct(param1);
         Test_struct1* ps1 = ((Test_struct1*)param_s->data);
@@ -175,7 +175,7 @@ void hffi_test_struct3(){
     hffi_value* input[2];
     input[0] = param1;
     input[1] = NULL;
-    if(hffi_call(fn, input, retVal, msg) == HFFI_STATE_OK){
+    if(hffi_call(fn, input, 0, retVal, msg) == HFFI_STATE_OK){
         printf("test call 'Test_struct1* method_struct(Test_struct1* s)' success.\n");
         hffi_struct* param_s = hffi_value_get_struct(param1);
         Test_struct1* ps1 = ((Test_struct1*)param_s->data);

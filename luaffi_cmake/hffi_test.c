@@ -42,7 +42,7 @@ void hffi_test2(){
     char _m[128];
     char* msg[1];
     msg[0] = _m;
-    int r = hffi_call(func, arr, out, msg);
+    int r = hffi_call(func, arr, 0, out, msg);
     if(r == 0){
         int out_ptr;
         int out_r = hffi_value_get_int(out, &out_ptr);
@@ -76,7 +76,7 @@ void hffi_test1(){
     char _m[128];
     char* msg[1];
     msg[0] = _m;
-    int r = hffi_call(func, arr, out, msg);
+    int r = hffi_call(func, arr, 0, out, msg);
     if(r == 0){
         int out_ptr;
         int out_r = hffi_value_get_int(out, &out_ptr);

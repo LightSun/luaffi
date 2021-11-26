@@ -21,6 +21,7 @@ void test_dymlib(){
     array_list* list = array_list_new2(4);
     array_list_add(list, val1);
     array_list_add(list, val2);
+    //as libffi has some limit of use ffi_cif.
     hffi_cif* cif = hffi_new_cif(FFI_DEFAULT_ABI, list, 0, val_ret, NULL);
     hffi_cif_call(cif, func->func_ptr);
 

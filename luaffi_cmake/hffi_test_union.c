@@ -80,7 +80,7 @@ void test_call_union1(int hffi_t,void* fn, void (*Func_post)(hffi_value*)){
     hffi_value* in[2];
     in[0] = val_param;
     in[1] = NULL;
-    if(hffi_call(fn, in, val_ret, msg) == HFFI_STATE_OK){
+    if(hffi_call(fn, in, 0, val_ret, msg) == HFFI_STATE_OK){
         printf("success !!! \n");
         Func_post(val_ret);
 //        hffi_struct* s_ret = hffi_value_get_struct(val_ret);

@@ -37,7 +37,7 @@ int hffi_value_get_##t(hffi_value* val, t* out_ptr){\
 case ffi_t:{\
     hffi_value* hv = hffi_new_value(ffi_t, HFFI_TYPE_VOID, sizeof (type));\
     *((type*)hv->ptr) = *((type*)val_ptr);\
-    printf("hffi_new_value_raw_type2: ptr = %d, val = %d\n", hv->ptr, *((type*)hv->ptr));\
+    /* printf("hffi_new_value_raw_type2: ptr = %d, val = %d\n", hv->ptr, *((type*)hv->ptr));*/\
     return hv;\
 }break;
 
@@ -311,7 +311,7 @@ hffi_value* hffi_new_value_ptr_nodata(sint8 hffi_t2){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
     val_ptr->ptr = NULL;
-    val_ptr->multi_level_ptr = 1;
+    //val_ptr->multi_level_ptr = 1;
     val_ptr->base_ffi_type = HFFI_TYPE_POINTER;
     val_ptr->pointer_base_type = hffi_t2;
     val_ptr->ref = 1;
@@ -453,7 +453,7 @@ hffi_value* hffi_value_copy(hffi_value* val){
 void hffi_delete_value(hffi_value* val){
     int old = atomic_add(&val->ref, -1);
     if(old == 1){
-        printf("hffi_delete_value(will delete): addr = %p\n", val);
+       // printf("hffi_delete_value(will delete): addr = %p\n", val);
         //delete ptr
         switch (val->base_ffi_type) {
         case HFFI_TYPE_STRUCT:{
@@ -615,7 +615,7 @@ void hffi_value_dump(hffi_value* val, struct hstring* hs){
 #define DEF_hffi_value_dump_IMPL(ffi_t, type, format)\
 case ffi_t:{\
     hstring_appendf(hs, format, *((type*)val->ptr));\
-    printf("hffi_value_dump: %d\n", *((type*)val->ptr));\
+    /*printf("hffi_value_dump: %d\n", *((type*)val->ptr));*/\
     return;\
 }break;
     int ffi_t = val->base_ffi_type;
@@ -700,11 +700,27 @@ static inline void* __get_data_ptr(hffi_value* v){
     };
     }
 }
-int hffi_call(void (*fn)(void), hffi_value** in, hffi_value* out, char** msg){
-    return hffi_call_abi(FFI_DEFAULT_ABI, fn, in, out, msg);
+
+int hffi_call(void (*fn)(void), hffi_value** in, int var_count,hffi_value* out, char** msg){
+    return hffi_call_abi(FFI_DEFAULT_ABI, fn, in, var_count, out, msg);
 }
-int hffi_call_abi(int abi,void (*fn)(void), hffi_value** in,hffi_value* out, char** msg){
+
+int hffi_call_abi(int abi,void (*fn)(void), hffi_value** in,int var_count,hffi_value* out, char** msg){
     hffi_get_pointer_count(in_count, in);
+    array_list* list = array_list_new2(in_count * 4 / 3 + 1);
+    for(int i = 0 ; i < in_count ; i ++){
+        array_list_add(list, in[i]);
+    }
+    int result = hffi_call_from_list(abi, fn, list, var_count, out, msg);
+    array_list_delete2(list, NULL);
+    return result;
+}
+
+int hffi_call_from_list(int abi, void (*fn)(void), struct array_list* in, int var_count, hffi_value* out, char** msg){
+    int in_count = array_list_size(in);
+    if(var_count > in_count){
+        return HFFI_STATE_FAILED;
+    }
     //param types with values
     ffi_type ** argTypes = NULL;
     void **args = NULL;
@@ -712,12 +728,12 @@ int hffi_call_abi(int abi,void (*fn)(void), hffi_value** in,hffi_value* out, cha
         argTypes = alloca(sizeof(ffi_type *) *in_count);
         args = alloca(sizeof(void *) *in_count);
         for(int i = 0 ; i < in_count ; i ++){
-            argTypes[i] = hffi_value_get_rawtype(in[i], msg);
+            argTypes[i] = hffi_value_get_rawtype((hffi_value*)array_list_get(in, i), msg);
             if(argTypes[i] == NULL){
                 return HFFI_STATE_FAILED;
             }
             //cast param value
-            args[i] = __get_data_ptr(in[i]);
+            args[i] = __get_data_ptr((hffi_value*)array_list_get(in, i));
         }
     }
     //prepare call
@@ -726,7 +742,12 @@ int hffi_call_abi(int abi,void (*fn)(void), hffi_value** in,hffi_value* out, cha
     if(return_type == NULL){
         return HFFI_STATE_FAILED;
     }
-    ffi_status s = ffi_prep_cif(&cif, abi, (unsigned int)in_count, return_type, argTypes);
+    ffi_status s;
+    if(var_count > 0){
+        s = ffi_prep_cif_var(&cif, abi, in_count - var_count,(unsigned int)in_count, return_type, argTypes);
+    }else{
+        s = ffi_prep_cif(&cif, abi, (unsigned int)in_count, return_type, argTypes);
+    }
     switch (s) {
     case FFI_OK:{
         ffi_call(&cif, fn, __get_data_ptr(out), args);
@@ -746,6 +767,7 @@ int hffi_call_abi(int abi,void (*fn)(void), hffi_value** in,hffi_value* out, cha
     }
     return HFFI_STATE_FAILED;
 }
+
 //-----------------------------------------------
 static void __smtypes_travel_ref(void* ud, int size, int index,void* ele){
     H_UNSED(ud)
@@ -1809,14 +1831,6 @@ hffi_cif* hffi_new_cif(int abi,array_list* in_vals, int var_count,hffi_value* ou
         args = MALLOC(sizeof(void *) *in_count);
         for(int i = 0 ; i < in_count ; i ++){
             val = array_list_get(in_vals, i);
-
-//            int out = 0;
-//            if(i == 0){
-//                hffi_value_get_sint8(val, &out);
-//            }else{
-//                hffi_value_get_int(val, &out);
-//            }
-//            printf("input %d: %d\n", i, out);
 
             argTypes[i] = hffi_value_get_rawtype(val, msg);
             if(argTypes[i] == NULL){

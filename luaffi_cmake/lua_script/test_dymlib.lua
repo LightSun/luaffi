@@ -19,18 +19,25 @@ local val1 = hffi.value(sint8, 1)
 local val2 = hffi.value(int, 2)
 local val_ret = hffi.value(int, 0)
 
-print("addr_val1 = ", val1.addr())
-print("addr_val2 = ", val2.addr())
-print("addr_val3 = ", val_ret.addr())
-print("val_ret = ", val_ret)
-
-local cif1 = hffi.cif{ret=val_ret, val1, val2}
-
 local libtest = hffi.loadLib("libtest_hffi")
 
-local res = libtest["libtest_add_s8s32_s32"].call(cif1)
-print("addr_res = ", res.addr())
+-- test 1
+local res = libtest["libtest_add_s8s32_s32"].call({ret = val_ret, val1, val2});
+print("call method 'libtest_add_s8s32_s32' result: ", res)
 
-print("call method libtest_add_s8s32_s32 result: ", res)
+-- test 2
+val_ret = hffi.value(pointer, int);
+local res = libtest["libtest_add_s8s32_s32p"].call({ret = val_ret, val1, val2});
+print("call method 'libtest_add_s8s32_s32p' result: ", res)
+
+-- test 3
+val1 = hffi.value(pointer, sint8, 1)
+val2 = hffi.value(pointer, int, 2)
+val_ret = hffi.value(pointer, int);
+local res = libtest["libtest_add_s8ps32p_s32p"].call({ret = val_ret, val1, val2});
+print("call method 'libtest_add_s8ps32p_s32p' result: ", res)
+
+-- test 4
+
 
 hffi.undefines();

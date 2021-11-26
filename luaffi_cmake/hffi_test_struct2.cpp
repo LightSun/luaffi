@@ -54,7 +54,7 @@ TEST(testCase,test_struct1){
     hffi_value* in_vals[2];
     in_vals[0] = p1;
     in_vals[1] = NULL;
-    EXPECT_EQ(hffi_call(fn, in_vals, ret, NULL), HFFI_STATE_OK);
+    EXPECT_EQ(hffi_call(fn, in_vals, 0, ret, NULL), HFFI_STATE_OK);
     EXPECT_EQ(hffi_value_get_struct(ret), hs_ret);
     //return value.
     sint16 ret_hs_val1 = 0;

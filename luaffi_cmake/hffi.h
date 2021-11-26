@@ -174,7 +174,7 @@ void hffi_value_dump(hffi_value* val, struct hstring* buf);
  * @param msg : the error msg ,if need. or NULL
  * @return HFFI_STATE_SUCCESS for success. HFFI_STATE_FAILED failed
  */
-int hffi_call(void (*fn)(void), hffi_value** in, hffi_value* out, char** msg);
+int hffi_call(void (*fn)(void), hffi_value** in, int var_count,hffi_value* out, char** msg);
 
 /**
  * @brief hffi_call_abi
@@ -184,7 +184,9 @@ int hffi_call(void (*fn)(void), hffi_value** in, hffi_value* out, char** msg);
  * @param msg: the msg
  * @return HFFI_STATE_SUCCESS for success. HFFI_STATE_FAILED failed
  */
-int hffi_call_abi(int abi, void (*fn)(void), hffi_value** in, hffi_value* out, char** msg);
+int hffi_call_abi(int abi, void (*fn)(void), hffi_value** in, int var_count, hffi_value* out, char** msg);
+
+int hffi_call_from_list(int abi, void (*fn)(void), struct array_list* in, int var_count, hffi_value* out, char** msg);
 
 //-------------------- sm type -------------------------------
 
