@@ -152,6 +152,8 @@ void dym_delete_lib(dym_lib* lib){
 }
 //-------------------------------------
 static int __find_ptr(void* ud, int size, int idx, void* data){
+    (void)size;
+    (void)idx;
     const char* func_name = ud;
     if(strcmp(((dym_func*)data)->name, func_name) == 0){
         return 0;
@@ -183,6 +185,7 @@ dym_func* dym_lib_get_function(dym_lib* lib, const char* func_name, int ref){
 
 //-----------------------
 static int __delete_func_find(void* ud,void* rawEle, void* pEle){
+    (void)ud;
     dym_func* f1 = rawEle;
     dym_func* f2 = pEle;
     return strcmp(f1->name, f2->name);
