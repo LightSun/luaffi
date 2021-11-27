@@ -8,6 +8,7 @@
 #include "h_string.h"
 
 #include "lua_utils.h"
+#include "h_float_bits.h"
 
 #define __N_VAL INT_MIN
 
@@ -580,7 +581,7 @@ static int __struct_get(lua_State *L){
          return push_ptr_hffi_struct(L, hstr);
     }
     harray* arr = hffi_struct_get_harray(hs, index);
-    if(hstr != NULL){
+    if(arr != NULL){
          harray_ref(arr, 1);
          return push_ptr_harray(L, arr);
     }
@@ -642,6 +643,7 @@ static int xffi_struct_index(lua_State *L){
         __INDEX_METHOD("getTypeAlignment", __struct_typeAlignment)
         //check member name as method
         __STRUCT_GET_MEMBER_INDEX(1, hs->count, fun_name);
+        //int index = hlua_get_struct_member_index(L, 1, hs->count, fun_name);
         if(index >= 0){
             //make index replace name
             lua_pushinteger(L, index);
@@ -659,9 +661,15 @@ static int xffi_struct_index(lua_State *L){
         //unknown.
         return 0;
     }
-    if(ffi_t == HFFI_TYPE_FLOAT || ffi_t == HFFI_TYPE_DOUBLE){
-        lua_Number num = 0;
+    if(ffi_t == HFFI_TYPE_FLOAT){
+        float num = 0;
         hffi_struct_get_base(hs, index, HFFI_TYPE_FLOAT, &num);
+        lua_pushnumber(L, num);
+        return 1;
+    }
+    if(ffi_t == HFFI_TYPE_DOUBLE){
+        double num = 0;
+        hffi_struct_get_base(hs, index, HFFI_TYPE_DOUBLE, &num);
         lua_pushnumber(L, num);
         return 1;
     }else{    
@@ -676,7 +684,7 @@ static int xffi_struct_index(lua_State *L){
              return push_ptr_hffi_struct(L, hstr);
         }
         harray* arr = hffi_struct_get_harray(hs, index);
-        if(hstr != NULL){
+        if(arr != NULL){
              harray_ref(arr, 1);
              return push_ptr_harray(L, arr);
         }
@@ -719,10 +727,14 @@ static int xffi_struct_newindex(lua_State *L){
         return 0;
     }break;
 
-    case  HFFI_TYPE_FLOAT:
-    case  HFFI_TYPE_DOUBLE:{
-        lua_Number num = luaL_checknumber(L, 3);
+    case  HFFI_TYPE_FLOAT:{
+        float num = (float)luaL_checknumber(L, 3);
         hffi_struct_set_base(hs, index, HFFI_TYPE_FLOAT, &num);
+        return 0;
+    }break;
+    case  HFFI_TYPE_DOUBLE:{
+        double num = (double)luaL_checknumber(L, 3);
+        hffi_struct_set_base(hs, index, HFFI_TYPE_DOUBLE, &num);
         return 0;
     }break;
 
@@ -899,7 +911,13 @@ static int __hiff_value_get(lua_State *L){
     if(ffi_t == HFFI_TYPE_POINTER){
         ffi_t = val->pointer_base_type;
     }
-    if(ffi_t == HFFI_TYPE_FLOAT || ffi_t == HFFI_TYPE_DOUBLE){
+    if(ffi_t == HFFI_TYPE_FLOAT){
+        float num = 0;
+        hffi_value_get_base(val, &num);
+        lua_pushnumber(L, num);
+        return 1;
+    }
+    if(ffi_t == HFFI_TYPE_DOUBLE){
         lua_Number num = 0;
         hffi_value_get_base(val, &num);
         lua_pushnumber(L, num);

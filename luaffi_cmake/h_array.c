@@ -10,7 +10,8 @@
 #define DEF_HARRAY_ALLOC_DATA(x)\
 harray* arr = x;\
 if(arr == NULL) return NULL;\
-arr->data = MALLOC(arr->data_size);
+arr->data = MALLOC(arr->data_size);\
+memset(arr->data, 0, arr->data_size);
 
 harray* harray_new_structs(struct array_list* structs){
     int every_size = hffi_struct_get_data_size(array_list_get(structs, 0));

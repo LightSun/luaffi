@@ -1133,6 +1133,7 @@ static inline hffi_struct* hffi_new_struct_from_list0(int abi,struct array_list*
     //of create by parent struct . never need MALLOC memory.
     if(parent_pos == HFFI_STRUCT_NO_PARENT){
         ptr->data = MALLOC(total_size);
+        memset(ptr->data, 0, total_size);
     }else{
         ptr->data = NULL;
     }
@@ -1440,7 +1441,7 @@ int hffi_struct_get_base(hffi_struct* hs, int index, sint8 target_hffi, void* pt
 #define DEF__struct_get_base(ffi_t, type)\
 case ffi_t:{\
     *((type*)ptr) = ((type*)data_ptr)[0];\
-    printf("hffi_struct_get_base: val = %d\n", ((type*)data_ptr)[0]);\
+    printf("hffi_struct_get_base: val = %.2f\n", ((type*)data_ptr)[0]);\
     return HFFI_STATE_OK;\
 }break;
 
@@ -1466,7 +1467,7 @@ case ffi_t:{\
 }
 int hffi_struct_set_base(hffi_struct* hs, int index, sint8 target_hffi, void* ptr){
 #define DEF__struct_set_base(ffi_t, type)\
-    case ffi_t:{\
+case ffi_t:{\
     ((type*)data_ptr)[0] = *((type*)ptr);\
     return HFFI_STATE_OK;\
 }break;
@@ -1692,6 +1693,9 @@ case hffi_t:{\
                 default:{
                     hstring_append(hs, " \n<unknown> ");
                 }break;
+            }
+            if(i != arr->count - 1){\
+                hstring_append(hs, " ,");\
             }
         }
         hstring_append(hs, " ]");
@@ -1953,21 +1957,7 @@ void hffi_delete_cif(hffi_cif* hcif){
     }
 }
 void hffi_cif_call(hffi_cif* hcif, void* fn){
-//    hstring* hs = hstring_new();
-//    hstring_append(hs, "before call inputs: \n");
-//    array_list_dump_values(hcif->in_vals, hs);
-//    hstring_append(hs, "\nbefore call out: \n");
-//    hffi_value_dump(hcif->out, hs);
-//    printf(hstring_tostring(hs));
-//    hstring_delete(hs);
     ffi_call(hcif->cif, fn, __get_data_ptr(hcif->out), hcif->args);
-//    hs = hstring_new();
-//    array_list_dump_values(hcif->in_vals, hs);
-//    hstring_append(hs, "after call inputs: \n");
-//    hstring_append(hs, "\nafter call out: \n");
-//    hffi_value_dump(hcif->out, hs);
-//    printf(hstring_tostring(hs));
-//    hstring_delete(hs);
 }
 hffi_value* hffi_cif_get_result_value(hffi_cif* hcif){
     return hcif->out;

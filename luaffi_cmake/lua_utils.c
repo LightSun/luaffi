@@ -128,6 +128,9 @@ int hlua_get_struct_member_index(lua_State* L, int tab_index, int count, const c
     array_list* sm_names = (array_list*)hlua_get_light_uservalue(L, tab_index);
     int index = -1;
     char* tmp_name;
+    if(strcmp("arr", in_name) == 0){
+        tmp_name = NULL;
+    }
     for(int i = count - 1 ; i >= 0 ; i --){
         tmp_name = array_list_get(sm_names, i);
         if(tmp_name != NULL && strcmp((char*)tmp_name, in_name) == 0){

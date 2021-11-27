@@ -68,8 +68,11 @@ sint8,"s8";
 }
 input_struct.f = 9.6
 input_struct.u64 = 100
-input_struct.arr.set(0, {10, 20, 30})
+input_struct.arr.set(0, {10, 20, 30}) -- 0,0,0???
 input_struct.s8 = 127
+
+print("input_struct.f: ", input_struct.f)
+print("input_struct: ", input_struct)
 
 local out_struct = hffi.struct{
 float,"f";
@@ -83,3 +86,4 @@ print("call method 'libtest_struct_s_s' result: ", res)
 assert(out_struct == input_struct)
 
 hffi.undefines();
+print("-------- end test_dymlib ---------");
