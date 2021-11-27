@@ -7,6 +7,7 @@
 #include "h_list.h"
 #include "h_array.h"
 #include "h_string.h"
+#include "h_float_bits.h"
 
 #define hffi_new_value_auto_x(ffi_t,type) \
 hffi_value* hffi_new_value_##type(type val){\
@@ -607,7 +608,57 @@ harray* hffi_value_get_harray(hffi_value* val){
 harray* hffi_value_get_pointer_as_array(hffi_value* val, int rows, int cols,int continue_mem, int share_memory){
     return hffi_get_pointer_as_array_impl(val->pointer_base_type, val->ptr, rows, cols, continue_mem, share_memory);
 }
+int hffi_value_eq(hffi_value* val, hffi_value* val2){
+    if(val->base_ffi_type != val2->base_ffi_type || val->pointer_base_type != val2->pointer_base_type){
+        return 1;
+    }
+    if(val->ptr == NULL){
+        return val2->ptr == NULL ? HFFI_TRUE :HFFI_FALSE;
+    }else{
+        if(val2->ptr == NULL){
+            return HFFI_FALSE;
+        }
+    }
+#define DEF_hffi_value_eq_base(ffi_t, type)\
+case ffi_t:{\
+    if(*((type*)val->ptr) == *((type*)val2->ptr)){\
+        return HFFI_TRUE;\
+    }\
+    return HFFI_FALSE;\
+}break;
 
+    int ffi_t = val->base_ffi_type;
+    if(ffi_t == HFFI_TYPE_POINTER){
+        ffi_t = val->pointer_base_type;
+    }
+    DEF_HFFI_BASE_SWITCH_INT(DEF_hffi_value_eq_base, ffi_t)
+    if(ffi_t == HFFI_TYPE_FLOAT){
+        return H_FLOAT_EQ(*((float*)val->ptr), *((float*)val2->ptr));
+    }else if(ffi_t == HFFI_TYPE_FLOAT){
+        return H_DOUBLE_EQ(*((double*)val->ptr), *((double*)val2->ptr));
+    }
+
+    switch (val->base_ffi_type) {
+        case HFFI_TYPE_HARRAY:
+        case HFFI_TYPE_HARRAY_PTR:{
+            return harray_eq(hffi_value_get_harray(val), hffi_value_get_harray(val2));
+        }break;
+
+        case HFFI_TYPE_STRUCT_PTR:
+        case HFFI_TYPE_STRUCT:{
+            return hffi_struct_eq(hffi_value_get_struct(val), hffi_value_get_struct(val2));
+        }break;
+
+        case HFFI_TYPE_POINTER:{
+            if(val->pointer_base_type == HFFI_TYPE_HARRAY){
+                return harray_eq(hffi_value_get_harray(val), hffi_value_get_harray(val2));
+            }else if(val->pointer_base_type == HFFI_TYPE_STRUCT){
+                return hffi_struct_eq(hffi_value_get_struct(val), hffi_value_get_struct(val2));
+            }
+        }break;
+    }
+    return HFFI_FALSE;
+}
 void hffi_value_dump(hffi_value* val, struct hstring* hs){
     if(val->ptr == NULL){
         return;
@@ -664,6 +715,7 @@ case ffi_t:{\
         }break;
     }
 }
+
 void list_travel_value_dump(void* d, struct hstring* hs){
     if(d) hffi_value_dump((hffi_value*)d, hs);
     else hstring_append(hs, "null");

@@ -424,7 +424,7 @@ static const luaL_Reg g_hffi_smtype_Methods[] = {
 };
 static int xffi_smtype_new(lua_State* L){
     //type/smtypes
-    //harray/hffi_struct. bool(ptr or not)
+    //harray/hffi_struct [, bool(ptr or not)]
     switch (lua_type(L, 1)) {
     case LUA_TNUMBER:{
         return push_ptr_hffi_smtype(L, hffi_new_smtype((sint8)luaL_checkinteger(L, 1)));
@@ -760,11 +760,16 @@ static int xffi_struct_tostring(lua_State* L){
     hstring_delete(hs);
     return 1;
 }
+static int xffi_struct_eq(lua_State* L){
+     lua_pushboolean(L, hffi_struct_eq(get_ptr_hffi_struct(L, 1), get_ptr_hffi_struct(L, 2)) == HFFI_TRUE);
+     return 1;
+}
 
 static const luaL_Reg g_hffi_struct_Methods[] = {
     {"__gc", xffi_struct_gc},
     {"__index", xffi_struct_index},
     {"__newindex", xffi_struct_newindex},
+    {"__eq", xffi_struct_eq},
     {"__len", xffi_struct_count},
     {"__tostring", xffi_struct_tostring},
     {NULL, NULL}
@@ -934,10 +939,15 @@ static int xffi_value_tostring(lua_State *L){
     hstring_delete(hs);
     return 1;
 }
+static int xffi_value_eq(lua_State *L){
+    lua_pushboolean(L, hffi_value_eq(get_ptr_hffi_value(L, 1), get_ptr_hffi_value(L, 2)) == HFFI_TRUE);
+    return 1;
+}
 
 static const luaL_Reg g_hffi_value_Methods[] = {
     {"__gc", xffi_value_gc},
     {"__index", xffi_value_index},
+    {"__eq", xffi_value_eq},
     {"__tostring", xffi_value_tostring},
     {NULL, NULL}
 };
@@ -953,28 +963,37 @@ static int xffi_dym_func_gc(lua_State *L){
 1, create a cif to hold some cif info. and latter to call.
 */
 static int xffi_dym_func_call(lua_State* L){
-    dym_func* func = get_ptr_dym_func(L, lua_upvalueindex(1));
+    dym_func* func;
+    int tab_idx;
+    if(lua_type(L, 1) == LUA_TTABLE){
+        tab_idx = 1;
+        func = get_ptr_dym_func(L, lua_upvalueindex(1));
+    }else{
+        //1 is dym_func. 2 is table
+        func = get_ptr_dym_func(L, 1);
+        tab_idx = 2;
+    }
     //ret_type, tab_param_types.
-    luaL_checktype(L, 1, LUA_TTABLE);
-    int len = lua_rawlen(L, 1);
+    luaL_checktype(L, tab_idx, LUA_TTABLE);
+    int len = lua_rawlen(L, tab_idx);
     //abi
     int abi = FFI_DEFAULT_ABI;
-    abi = hlua_get_int(L, 1, "abi", abi);
+    abi = hlua_get_int(L, tab_idx, "abi", abi);
     //var count
     int var_count = 0;
-    var_count = hlua_get_int(L, 1, "var_count", var_count);
+    var_count = hlua_get_int(L, tab_idx, "var_count", var_count);
     if(var_count > len){
         return luaL_error(L, "var count can't bigger than total parameter count.");
     }
     //ret
     hffi_value* ret_val;
-    if(lua_getfield(L, 1, "ret") != LUA_TNIL){
+    if(lua_getfield(L, tab_idx, "ret") != LUA_TNIL){
         ret_val = __get_value(L, -1);
         if(ret_val == NULL){
              return luaL_error(L, "ret: unsupport cif type. type must be (sint8,hffi_struct,hffi_value)");
         }
         lua_pushnil(L);
-        lua_setfield(L, 1, "ret");
+        lua_setfield(L, tab_idx, "ret");
     }else{
         ret_val = hffi_new_value_raw_type(HFFI_TYPE_VOID);
     }
@@ -983,7 +1002,7 @@ static int xffi_dym_func_call(lua_State* L){
     hffi_value* val;
     array_list* params = array_list_new(12, 0.75f);
     for(int i = 0 ;i < len ; i ++){
-        lua_rawgeti(L, 1, i+1);
+        lua_rawgeti(L, tab_idx, i+1);
         //type: int, struct, value?
         val = __get_value(L, -1);
         if(val != NULL){
@@ -1024,6 +1043,11 @@ static const luaL_Reg g_dym_func_Methods[] = {
 };
 //------------------ dym_lib ----------------------------
 
+static int __dym_lib_func_call(lua_State *L){
+    lua_pushvalue(L, lua_upvalueindex(1));
+    lua_insert(L, 1);
+    return xffi_dym_func_call(L);
+}
 static int xffi_dym_lib_gc(lua_State *L){
     dym_lib* lib = get_ptr_dym_lib(L, -1);
     dym_delete_lib(lib);
@@ -1038,6 +1062,7 @@ static int xffi_dym_lib_index(lua_State *L){
         return luaL_error(L, "can't find function(%s) for lib(%s)", lua_tostring(L, 2), lua_tostring(L, -1));
     }
     push_ptr_dym_func(L, func);
+    lua_pushcclosure(L, __dym_lib_func_call, 1);
     return 1;
 }
 static int xffi_dym_lib_toString(lua_State *L){

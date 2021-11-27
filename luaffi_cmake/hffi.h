@@ -163,9 +163,13 @@ struct harray* hffi_value_get_pointer_as_array(hffi_value* val, int rows, int co
 
 //ext: the ext infos for 'int rows, int cols, int continue_mem, int share_mem'.
 int hffi_value_set_any(hffi_value* val, void* val_ptr);
+
+void hffi_value_dump(hffi_value* val, struct hstring* buf);
+
+/** compare two value. if they are equals. 0 means equals. */
+int hffi_value_eq(hffi_value* val, hffi_value* val2);
 //--------- for test ----------
 int hffi_value_set_base(hffi_value* val, void* in_ptr);
-void hffi_value_dump(hffi_value* val, struct hstring* buf);
 
 /**
  * @brief hffi_call: do call ffi.

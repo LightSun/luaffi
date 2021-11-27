@@ -18,12 +18,12 @@ endif(ext_libffi)
 
 if(gTest_enabled)
     #work
-    include_directories(D:/study/github/thirds/googletest-release-1.11.0/googletest/include)
-    set(gTest_lib_dir D:/study/github/thirds/googletest-release-1.11.0/googletest/build_out)
+    #include_directories(D:/study/github/thirds/googletest-release-1.11.0/googletest/include)
+    #set(gTest_lib_dir D:/study/github/thirds/googletest-release-1.11.0/googletest/build_out)
 
     #home
-    #include_directories(D:/study/google/googletest-release-1.11.0/googletest/include)
-    #SET(gTest_lib_dir D:/study/google/googletest-release-1.11.0/build_out/x64_mingw)
+    include_directories(D:/study/google/googletest-release-1.11.0/googletest/include)
+    SET(gTest_lib_dir D:/study/google/googletest-release-1.11.0/build_out/x64_mingw)
 
     #link_directories(${gTest_lib_dir}/release/libgtest.a)
     #set(gTest_libs gtest)
@@ -39,6 +39,7 @@ add_library(ffi2 STATIC ffi2.h ffi.c ffi_ext.c)
 # USE_C11_ATOMICS,USE_MSC_ATOMICS,USE_GCC_ATOMICS,USE_PTHREAD_ATOMICS
 
 SET(SRC_HFFI
+    h_float_bits.h
     hffi_common.h
     h_alloctor.h
     h_alloctor.c

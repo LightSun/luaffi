@@ -50,6 +50,7 @@ typedef void (*hffi_fn)(void);
 #define HFFI_STATE_OK 0
 #define HFFI_STATE_FAILED -1
 #define HFFI_TRUE HFFI_STATE_OK
+#define HFFI_FALSE HFFI_STATE_FAILED
 
 #define HFFI_TYPE_VOID FFI_TYPE_VOID
 #define HFFI_TYPE_INT FFI_TYPE_INT
@@ -88,6 +89,19 @@ macro(HFFI_TYPE_UINT64, uint64)\
 macro(HFFI_TYPE_FLOAT, float)\
 macro(HFFI_TYPE_DOUBLE, double)\
 macro(HFFI_TYPE_INT, sint32)\
+}
+
+#define DEF_HFFI_BASE_SWITCH_INT(macro, ffi_t)\
+switch (ffi_t) {\
+macro(HFFI_TYPE_SINT8, sint8)\
+macro(HFFI_TYPE_UINT8, uint8)\
+macro(HFFI_TYPE_SINT16, sint16)\
+macro(HFFI_TYPE_UINT16, uint16)\
+macro(HFFI_TYPE_SINT32, sint32)\
+macro(HFFI_TYPE_UINT32, uint32)\
+macro(HFFI_TYPE_SINT64, sint64)\
+macro(HFFI_TYPE_UINT64, uint64)\
+macro(HFFI_TYPE_INT, int)\
 }
 
 #define DEF_HFFI_BASE_SWITCH2(macro_int, macro_f, ffi_t)\

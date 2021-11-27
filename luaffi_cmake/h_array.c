@@ -5,6 +5,7 @@
 #include "h_alloctor.h"
 #include "h_list.h"
 #include "h_string.h"
+#include "h_float_bits.h"
 
 #define DEF_HARRAY_ALLOC_DATA(x)\
 harray* arr = x;\
@@ -536,10 +537,23 @@ int harray_eq(harray* arr, harray* arr2){
     case HFFI_TYPE_UINT32:
     case HFFI_TYPE_SINT64:
     case HFFI_TYPE_UINT64:
-    case HFFI_TYPE_FLOAT:
-    case HFFI_TYPE_DOUBLE:
         if(memcmp(arr->data, arr2->data, arr->data_size) != 0){
             return HFFI_STATE_FAILED;
+        }
+        break;
+    case HFFI_TYPE_FLOAT:
+        for(int i = 0, c = arr->ele_count ; i < c ; i ++){
+            if(!H_FLOAT_EQ(((float*)arr->data)[i], ((float*)arr2->data)[i])){
+                return HFFI_STATE_FAILED;
+            }
+        }
+        break;
+    case HFFI_TYPE_DOUBLE:
+        for(int i = 0, c = arr->ele_count ; i < c ; i ++){
+            //printf("arr_eq double:  i = %d, v1 = %.5f, v2 = %.5f\n", i , ((float*)arr->data)[i], ((float*)arr2->data)[i]);
+            if(!H_DOUBLE_EQ(((double*)arr->data)[i], ((double*)arr2->data)[i])){
+                return HFFI_STATE_FAILED;
+            }
         }
         break;
     case HFFI_TYPE_VOID:
