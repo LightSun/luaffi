@@ -44,4 +44,6 @@ void hlua_delete_light_uservalue(lua_State* L, int tab_index);
 
 int hlua_get_struct_member_index(lua_State* L, int tab_index, int count, const char* in_name);
 
+LUALIB_API int luaB_dumpStack(lua_State* L);
+
 #endif // LUA_UTIL_H

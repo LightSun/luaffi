@@ -20,9 +20,11 @@ print("test array 2: ", tostring(arr));
 arr[1] = 100
 assert(arr[1]==100)
 arr[1] = {100, 101, 102}
+print("after: arr[1] = {100, 101, 102}: ", arr);
 assert(arr[1]==100)
 assert(arr[2]==101)
 arr.set(1, {5, 6})
+print("after: arr.set(1, {5, 6}): ", arr);
 assert(arr[1]==5)
 assert(arr[2]==6)
 

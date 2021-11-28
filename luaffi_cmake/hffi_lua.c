@@ -189,6 +189,7 @@ static inline int __harray_set_vals(lua_State* L, harray* arr, int index){
 
 static int xffi_harray_gc(lua_State* L){
     harray* arr = get_ptr_harray(L, 1);
+    hlua_delete_light_uservalue(L, -1);
     harray_delete(arr);
     return 0;
 }
@@ -198,9 +199,11 @@ static int xffi_harray_newindex(lua_State* L){
     int index = luaL_checkinteger(L, -2);
     //check if is N. set all element to it.
     if(index == __N_VAL){
+        //-1 is val
         for(int i = 0 ; i < arr->ele_count ; i ++){
             __harray_set_vals(L, arr, i);
         }
+        HFFI_SYNC_PARENT_I(arr)
         return 0;
     }
     if(index < 0) index = arr->ele_count + index;
@@ -209,24 +212,23 @@ static int xffi_harray_newindex(lua_State* L){
         if(c > arr->ele_count - index){
             c = arr->ele_count - index;
         }
-        lua_pushvalue(L, -3); // harray
-        lua_pushvalue(L, -3); // index
         for(int i = 0 ; i < c ; i ++){
-            lua_rawgeti(L, -3, i + 1); //sub element
-            lua_pushinteger(L, index + i);
-            lua_replace(L, -3);        //replace index and pop
-            //array, index, data
-            xffi_harray_newindex(L);
+            //element of table
+            lua_rawgeti(L, -1, i + 1);
+            __harray_set_vals(L, arr, i + index); //data index in c
             lua_pop(L, 1);
         }
+        HFFI_SYNC_PARENT_I(arr)
         return 0;
     }else{
         //int ot float
         __harray_set_vals(L, arr, index);
+        HFFI_SYNC_PARENT_I(arr)
         return 0;
     }
     return luaL_error(L, "wrong element type for __newindex(harray)!");
 }
+//when access harray from struct, we may need sync data to struct.
 static int __harray_func_set(lua_State* L){
     //index, data
     lua_pushvalue(L, lua_upvalueindex(1));
@@ -249,7 +251,14 @@ static int __harray_func_elesize(lua_State* L){
     lua_pushnumber(L, arr->data_size/ arr->ele_count);
     return 1;
 }
+static int __harray_func_addr(lua_State* L){
+    harray* arr = get_ptr_harray(L, lua_upvalueindex(1));
+    lua_pushfstring(L, "%p", arr);
+    return 1;
+}
+
 static const luaL_Reg g_harray_str_Methods[] = {
+    {"addr", __harray_func_addr},
     {"set", __harray_func_set},
     {"copy", __harray_func_copy},
     {"eletype", __harray_func_eletype},
@@ -273,6 +282,7 @@ static int xffi_harray_index(lua_State* L){
     }
     //tab, i
     harray* arr = get_ptr_harray(L, 1);
+
     int index = luaL_checkinteger(L, 2);
     if(index < 0) index = arr->ele_count + index;
     switch (arr->hffi_t) {
@@ -293,6 +303,7 @@ static int xffi_harray_index(lua_State* L){
      case HFFI_TYPE_HARRAY_PTR:{
          union harray_ele ele;
          if(harray_geti(arr, index, &ele) == HFFI_STATE_OK){
+             harray_ref((harray*)ele._extra, 1);
             return push_ptr_harray(L, (harray*)ele._extra);
          }
          return 0;
@@ -301,6 +312,7 @@ static int xffi_harray_index(lua_State* L){
      case HFFI_TYPE_STRUCT:{
          union harray_ele ele;
          if(harray_geti(arr, index, &ele) == HFFI_STATE_OK){
+             hffi_struct_ref((hffi_struct*)ele._extra, 1);
             return push_ptr_hffi_struct(L, (hffi_struct*)ele._extra);
          }
          return 0;
@@ -312,7 +324,7 @@ static int xffi_harray_index(lua_State* L){
 
 static int xffi_harray_len(lua_State* L){
     harray* arr = get_ptr_harray(L, 1);
-    lua_pushinteger(L, harray_get_count(arr));
+    lua_pushinteger(L, arr->ele_count);
     return 1;
 }
 static int xffi_harray_tostring(lua_State* L){
@@ -544,67 +556,7 @@ static int __struct_copy(lua_State *L){
     hlua_share_light_uservalue(L, 1, -1);
     return 1;
 }
-static int __struct_get(lua_State *L){
-    hffi_struct* hs = get_ptr_hffi_struct(L, lua_upvalueindex(1));
-    if(hs->data == NULL){
-        return 0;
-    }
-    //index, target_ffi, ptr
-    //multi level ptr
-    if(hs->parent_pos == HFFI_STRUCT_NO_DATA){
-        //int rows, int cols, int continue_mem, int share_mem
-        luaL_checktype(L, 1, LUA_TTABLE);
-        int continue_mem = 1;
-        int share_mem = 1;
-        int index = 0;
-        sint8 hffi_t = HFFI_TYPE_SINT8;
-        continue_mem = hlua_get_boolean(L, 1, "continue_mem", continue_mem);
-        share_mem = hlua_get_boolean(L, 1, "share_mem", share_mem);
-        index = hlua_get_int(L, 1, "index", index);
-        hffi_t = (sint8)hlua_get_int(L, 1, "type", hffi_t);
 
-        if(lua_rawlen(L, 1) == 0) return 0;
-        int rows = hlua_rawgeti_int(L, 1, 1);
-        int cols = 0;
-        if(lua_rawlen(L, 1) >= 2){
-            cols = hlua_rawgeti_int(L, 1, 2);
-        }
-        harray* arr = hffi_struct_get_as_array(hs, index, hffi_t, rows, cols, continue_mem, share_mem);
-        return push_ptr_harray(L, arr);
-    }
-    //index [,target_ffi_t]
-    //target_ffi_t: is for pointer.
-    int index = luaL_checkinteger(L, 1);
-    hffi_struct* hstr = hffi_struct_get_struct(hs, index);
-    if(hstr != NULL){
-         hffi_struct_ref(hstr, 1);
-         return push_ptr_hffi_struct(L, hstr);
-    }
-    harray* arr = hffi_struct_get_harray(hs, index);
-    if(arr != NULL){
-         harray_ref(arr, 1);
-         return push_ptr_harray(L, arr);
-    }
-    //target element type.
-    int ffi_t = HFFI_TYPE_SINT8;
-    if(hffi_struct_is_pointer(hs, index)){
-        ffi_t = luaL_checkinteger(L, 2);
-    }
-    if(ffi_t == HFFI_TYPE_FLOAT || ffi_t == HFFI_TYPE_DOUBLE){
-        lua_Number num = 0;
-        if(hffi_struct_get_base(hs, index, ffi_t, &num) == HFFI_STATE_OK){
-            lua_pushnumber(L, num);
-            return 1;
-        }
-    }else{
-        lua_Integer num = 0;
-        if(hffi_struct_get_base(hs, index, ffi_t, &num) == HFFI_STATE_OK){
-            lua_pushinteger(L, num);
-            return 1;
-        }
-    }
-    return 0;
-}
 static int __struct_getOffsets(lua_State *L){
     hffi_struct* hs = get_ptr_hffi_struct(L, lua_upvalueindex(1));
     size_t* offsets = HFFI_STRUCT_OFFSETS(hs->type, hs->count);
@@ -636,7 +588,6 @@ static int xffi_struct_index(lua_State *L){
     if(lua_type(L, 2) == LUA_TSTRING){
         const char* fun_name = lua_tostring(L, 2);
         __INDEX_METHOD("copy", __struct_copy)
-        __INDEX_METHOD("get", __struct_get)
         __INDEX_METHOD("getMembertype", __struct_memberType)
         __INDEX_METHOD("getOffsets", __struct_getOffsets)
         __INDEX_METHOD("getTypeSize", __struct_typeSize)
@@ -681,12 +632,14 @@ static int xffi_struct_index(lua_State *L){
         hffi_struct* hstr = hffi_struct_get_struct(hs, index);
         if(hstr != NULL){
              hffi_struct_ref(hstr, 1);
-             return push_ptr_hffi_struct(L, hstr);
+             push_ptr_hffi_struct(L, hstr);
+             return 1;
         }
         harray* arr = hffi_struct_get_harray(hs, index);
         if(arr != NULL){
              harray_ref(arr, 1);
-             return push_ptr_harray(L, arr);
+             push_ptr_harray(L, arr);
+             return 1;
         }
     }
     return 0;
@@ -724,25 +677,25 @@ static int xffi_struct_newindex(lua_State *L){
     case HFFI_TYPE_UINT64:{
         lua_Integer num = luaL_checkinteger(L, 3);
         hffi_struct_set_base(hs, index, HFFI_TYPE_INT, &num);
-        return 0;
+        break;
     }break;
 
     case  HFFI_TYPE_FLOAT:{
         float num = (float)luaL_checknumber(L, 3);
         hffi_struct_set_base(hs, index, HFFI_TYPE_FLOAT, &num);
-        return 0;
+        break;
     }break;
     case  HFFI_TYPE_DOUBLE:{
         double num = (double)luaL_checknumber(L, 3);
         hffi_struct_set_base(hs, index, HFFI_TYPE_DOUBLE, &num);
-        return 0;
+        break;
     }break;
 
     case HFFI_TYPE_HARRAY:
     case HFFI_TYPE_HARRAY_PTR:{
         harray* arr = get_ptr_harray(L, 3);
         if(hffi_struct_set_harray(hs, index, arr) == HFFI_STATE_OK){
-            return 0;
+            break;
         }
         return luaL_error(L, "set array(member) for struct failed.");
     }break;
@@ -751,11 +704,14 @@ static int xffi_struct_newindex(lua_State *L){
     case HFFI_TYPE_STRUCT_PTR:{
         hffi_struct* new_hs = get_ptr_hffi_struct(L, 3);
         if(hffi_struct_set_struct(hs, index, new_hs) == HFFI_STATE_OK){
-            return 0;
+            break;
         }
-         return luaL_error(L, "set struct(member) for struct failed.");
+        return luaL_error(L, "set struct(member) for struct failed.");
     }break;
+    default:
+        return luaL_error(L, "wrong struct type = %d", hs->hffi_types[index]);
     }
+    HFFI_SYNC_PARENT_I(hs)
     return 0;
 }
 

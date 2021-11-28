@@ -16,6 +16,7 @@ typedef struct harray{
     int ele_count;  //element count
     int VOLATIE ref;
     void** ele_list; //only used for harray* and hffi_struct*
+    hffi_parent* parent;
 }harray;
 
 union harray_ele{
@@ -67,7 +68,9 @@ harray* harray_new_from_data(sint8 hffi_t, void* data, int data_size, int ele_co
 harray* harray_copy(harray* src);
 void harray_delete(harray* arr);
 
-int harray_get_count(harray* arr);
+inline int harray_get_count(harray* arr){
+    return arr->ele_count;
+}
 void harray_ref(harray* arr, int c);
 
 int harray_geti(harray* arr, int index, union harray_ele* ptr);
@@ -79,6 +82,9 @@ int harray_set_struct_ptr(harray* arr, int index, struct hffi_struct* str);
 int harray_set_harray_ptr(harray* arr, int index, harray* str);
 
 int harray_eq(harray* arr, harray* arr2);
+void harray_sync_data(harray* arr, int reverse);
+/** sync struct or harray data to target arr. include sync the parent tree */
+void harray_sync_data_i(harray* arr, int index, void* ptr);
 
 void harray_dump(harray* arr, struct hstring* hs);
 

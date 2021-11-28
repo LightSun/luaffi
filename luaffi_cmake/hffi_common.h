@@ -159,6 +159,60 @@ struct hffi_struct;
 struct hstring;
 struct array_list;
 
+//parent info. used to sync child data to parent tree.
+//only used for harray/hffi_struct nested harray/hffi_struct
+//all set method for child will effect parent's value
+typedef struct hffi_parent{
+    sint8 hffi_t;
+    int index;    // the child index in parent.
+    void* ptr;
+}hffi_parent;
+
+typedef struct hffi_struct{
+    void* data;         // the data of struct, may be shared by parent struct.
+    ffi_type * type;    // struct base info. all types with offsets.
+    sint16 parent_pos;  // the parent position if need. or HFFI_STRUCT_NO_PARENT for no parent struct.
+                        // HFFI_STRUCT_NO_DATA for malloc data by others.
+    sint8 abi;          // which used to create
+    sint8* hffi_types;  // the member base types, latter used to get value.
+    int data_size;
+    int count;          // member count
+    int volatile ref;
+    struct array_list* sub_ffi_types;
+    struct array_list* children; // used to save struct_item
+    hffi_parent* parent;         // parent data.
+}hffi_struct;
+
+#define HFFI_SET_PARENT(i, child,_parent, type)\
+{if(child->parent == NULL){\
+    child->parent = MALLOC(sizeof (hffi_parent));\
+}\
+child->parent->hffi_t = type;\
+child->parent->ptr = _parent;\
+child->parent->index = i;}
+
+#define HFFI_CLEAR_PARENT(child)\
+if(child->parent != NULL){\
+    child->parent->ptr = NULL;\
+}
+
+#define HFFI_FREE_PARENT(child)\
+if(child->parent != NULL){\
+    FREE(child->parent);\
+    child->parent = NULL;\
+}
+#define HFFI_SYNC_PARENT_I(arr)\
+{if(arr->parent != NULL && arr->parent->ptr != NULL){\
+    switch (arr->parent->hffi_t) {\
+    case HFFI_TYPE_HARRAY:\
+    harray_sync_data_i((harray*)arr->parent->ptr, arr->parent->index, arr);\
+    break;\
+    case HFFI_TYPE_STRUCT:\
+    hffi_struct_sync_data_i((struct hffi_struct*)arr->parent->ptr, arr->parent->index, arr);\
+    break;\
+    }\
+}}
+
 void hffi_delete_struct(struct hffi_struct* c);
 
 void* hffi_struct_get_data(struct hffi_struct* c);
@@ -176,7 +230,11 @@ int hffi_struct_set_all(struct hffi_struct* c, void* ptr);
 struct hffi_struct* hffi_struct_copy(struct hffi_struct* src);
 int hffi_struct_eq(struct hffi_struct* hs1, struct hffi_struct* hs2);
 void hffi_struct_dump(struct hffi_struct* arr, struct hstring* hs);
-
+/** sync struct data , reverse or not.
+Note: this doesn't sync parent's data. */
+void hffi_struct_sync_data(struct hffi_struct* arr, int reverse);
+/** sync target index data. include sync the parent tree. */
+void hffi_struct_sync_data_i(struct hffi_struct* arr, int index, void* ptr);
 //-------------------------
 extern void list_travel_value_dump(void* d, struct hstring* hs);
 int hffi_base_type_size(sint8 hffi_t);

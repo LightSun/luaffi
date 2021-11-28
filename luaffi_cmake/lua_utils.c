@@ -9,6 +9,16 @@ struct HDataWrapper{
     volatile int ref;
 };
 
+#define __CONCAT_PRINTF(f, expre)\
+if(first){\
+    first = 0;\
+    printf(f, expre);\
+}else{\
+    char _buf[20];\
+    snprintf(_buf, 20, f, expre);\
+    printf(", %s", _buf);\
+}
+
 int hlua_get_ref(lua_State* L, int tab_id, const char* key, int t){
     tab_id = HLUA_ADJUST_ID(tab_id);
     int ref_ctx = LUA_NOREF;
@@ -110,7 +120,7 @@ void hlua_delete_light_uservalue(lua_State* L, int tab_index){
     struct HDataWrapper* w = (struct HDataWrapper*)lua_touserdata(L, -1);
     lua_pop(L, 1);
     if(atomic_add(&w->ref, -1) == 1){
-        w->func(w->data);
+        if(w->data) w->func(w->data);
         FREE(w);
     }
 }
@@ -124,13 +134,15 @@ void hlua_share_light_uservalue(lua_State* L, int tab_old, int tab_new){
     atomic_add(&w->ref, 1);
     lua_setuservalue(L, tab_new);
 }
+
+//--------------------------------------------------
 int hlua_get_struct_member_index(lua_State* L, int tab_index, int count, const char* in_name){
     array_list* sm_names = (array_list*)hlua_get_light_uservalue(L, tab_index);
     int index = -1;
     char* tmp_name;
-    if(strcmp("arr", in_name) == 0){
-        tmp_name = NULL;
-    }
+//    if(strcmp("arr", in_name) == 0){
+//        tmp_name = NULL;
+//    }
     for(int i = count - 1 ; i >= 0 ; i --){
         tmp_name = array_list_get(sm_names, i);
         if(tmp_name != NULL && strcmp((char*)tmp_name, in_name) == 0){
@@ -140,7 +152,45 @@ int hlua_get_struct_member_index(lua_State* L, int tab_index, int count, const c
     }
     return index;
 }
+LUALIB_API int luaB_dumpStack(lua_State* L){
+    printf("\nbegin dump lua stack: \n");
+    int i = 0;
+    int top = lua_gettop(L);
 
+    printf("{ ");
+    char buf[20]; //if string is to long. may cause stack exception.
+    int first = 1;
+    for (i = 1; i <= top; ++i) {
+        int t = lua_type(L, i);
+        switch (t) {
+            case LUA_TSTRING:
+            {
+                __CONCAT_PRINTF("%s", lua_tostring(L, i));
+            }
+                break;
+            case LUA_TBOOLEAN:
+            {
+                __CONCAT_PRINTF("%s", lua_toboolean(L, i) ? "true " : "false ");
+            }
+                break;
+
+            case LUA_TNUMBER:
+            {
+                sprintf(buf, "%g ", lua_tonumber(L, i));
+                __CONCAT_PRINTF("%s", buf);
+            }
+                break;
+            default:
+            {
+                sprintf(buf, "%s ", lua_typename(L, t));
+                __CONCAT_PRINTF("%s", buf);
+            }
+                break;
+        }
+    }
+    printf(" }\n");
+    return 0;
+}
 //---------------------------------------------
 
 #define CHECK_NEXT_ASPTR()\

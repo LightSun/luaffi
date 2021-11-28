@@ -69,10 +69,13 @@ sint8,"s8";
 input_struct.f = 9.6
 input_struct.u64 = 100
 input_struct.arr.set(0, {10, 20, 30}) -- 0,0,0???
-input_struct.s8 = 127
+print("input_struct.arr: ", input_struct.arr)
+input_struct.s8 = 10
 
-print("input_struct.f: ", input_struct.f)
+print("addr: ", arr.addr(), input_struct.arr.addr())
+--print("input_struct.f: ", input_struct.f)
 print("input_struct: ", input_struct)
+print("input_struct.arr[0]: ", input_struct.arr[0])
 
 local out_struct = hffi.struct{
 float,"f";
@@ -85,5 +88,18 @@ local res = libtest.libtest_struct_s_s {ret=out_struct, input_struct}
 print("call method 'libtest_struct_s_s' result: ", res)
 assert(out_struct == input_struct)
 
+--- test 6. 'libtest_struct_sp_sp'
+-- create an empty data struct
+out_struct = hffi.struct{
+no_data=true;
+float,"f";
+uint64,"u64";
+hffi.array(sint16, 3),"arr";
+sint8,"s8";
+}
+local res = libtest.libtest_struct_sp_sp {ret=hffi.value(out_struct, true), hffi.value(input_struct, true)}
+print("call method 'libtest_struct_sp_sp' result: ", res)
+
+-- ===============================================
 hffi.undefines();
 print("-------- end test_dymlib ---------");

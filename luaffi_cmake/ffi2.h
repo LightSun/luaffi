@@ -7,6 +7,6 @@
 
 LUAMOD_API int luaopen_ffi(lua_State *L);
 
-LUAMOD_API int luaB_dumpStack(lua_State* L);
+//LUAMOD_API int luaB_dumpStack(lua_State* L);
 
 #endif // FFI2_H
