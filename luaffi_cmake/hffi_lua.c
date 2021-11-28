@@ -256,10 +256,16 @@ static int __harray_func_addr(lua_State* L){
     lua_pushfstring(L, "%p", arr);
     return 1;
 }
+static int __harray_func_hasData(lua_State* L){
+    harray* arr = get_ptr_harray(L, lua_upvalueindex(1));
+    lua_pushboolean(L, arr->data != NULL);
+    return 1;
+}
 
 static const luaL_Reg g_harray_str_Methods[] = {
-    {"addr", __harray_func_addr},
     {"set", __harray_func_set},
+    {"hasData", __harray_func_hasData},
+    {"addr", __harray_func_addr},
     {"copy", __harray_func_copy},
     {"eletype", __harray_func_eletype},
     {"elesize", __harray_func_elesize},
@@ -583,11 +589,17 @@ static int __struct_memberType(lua_State *L){
     if(index >= hs->count) return 0;
     return hs->hffi_types[index];
 }
+static int __struct_hasData(lua_State *L){
+    hffi_struct* hs = get_ptr_hffi_struct(L, lua_upvalueindex(1));
+    lua_pushboolean(L, hs->data != NULL);
+    return 1;
+}
 static int xffi_struct_index(lua_State *L){
     hffi_struct* hs = get_ptr_hffi_struct(L, 1);
     if(lua_type(L, 2) == LUA_TSTRING){
         const char* fun_name = lua_tostring(L, 2);
         __INDEX_METHOD("copy", __struct_copy)
+        __INDEX_METHOD("hasData", __struct_hasData)
         __INDEX_METHOD("getMembertype", __struct_memberType)
         __INDEX_METHOD("getOffsets", __struct_getOffsets)
         __INDEX_METHOD("getTypeSize", __struct_typeSize)
@@ -895,6 +907,11 @@ static int __hiff_value_addr(lua_State *L){
      lua_pushfstring(L, "%p", (void*)val);
      return 1;
 }
+static int __hiff_value_hasData(lua_State *L){
+     hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
+     lua_pushboolean(L, hffi_value_hasData(val));
+     return 1;
+}
 
 static int xffi_value_index(lua_State *L){
     if(lua_type(L, 2) == LUA_TSTRING){
@@ -902,6 +919,7 @@ static int xffi_value_index(lua_State *L){
         __INDEX_METHOD("copy", __hiff_value_copy);
         __INDEX_METHOD("get", __hiff_value_get);
         __INDEX_METHOD("addr", __hiff_value_addr);
+        __INDEX_METHOD("hasData", __hiff_value_hasData);
     }
     return 0;
 }

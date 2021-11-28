@@ -252,7 +252,8 @@ int build_smtypes(lua_State* L, array_list* sm_list, array_list* sm_names,
     return HFFI_STATE_OK;
 }
 
-harray* hlua_new_harray_from_table(lua_State* L, int idx, Func_get_ptr_struct func_struct, Func_get_ptr_harray func_harray){
+harray* hlua_new_harray_from_table(lua_State* L, int idx, Func_get_ptr_struct func_struct,
+                                   Func_get_ptr_harray func_harray){
     //table(harray/struct/string/base/...)
     //len: the char array size, which used to create string
     //base_type: base ffi type, which indicate the memory size

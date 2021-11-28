@@ -137,6 +137,8 @@ hffi_value* hffi_value_copy(hffi_value* val);
 
 void hffi_delete_value(hffi_value* val);
 void hffi_value_ref(hffi_value* val, int count);
+//1 has data
+int hffi_value_hasData(hffi_value* val);
 
 ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg);
 

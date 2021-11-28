@@ -496,7 +496,20 @@ void hffi_delete_value(hffi_value* val){
 void hffi_value_ref(hffi_value* val, int count){
      atomic_add(&val->ref, count);
 }
-
+int hffi_value_hasData(hffi_value* val){
+    if(val->ptr == NULL){
+        return 0;
+    }
+    hffi_struct* hs = hffi_value_get_struct(val);
+    if(hs != NULL){
+        return hs->data != NULL;
+    }
+    harray* arr = hffi_value_get_harray(val);
+    if(arr != NULL){
+        return arr->data != NULL;
+    }
+    return 1;
+}
 #define DEF_VALUE_GET_BASE_IMPL(ffi_t, type)\
 case ffi_t:{\
     *((type*)out_ptr) = *((type*)val->ptr);\
