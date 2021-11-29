@@ -992,7 +992,7 @@ hffi_smtype* hffi_smtype_cpoy(hffi_smtype* src){
 }
 //--------------------------------------------------------------
 static void  __set_children_data_travel(hffi_struct* p,struct_item* item){
-    size_t * offsets = (size_t *) &p->type->elements[p->count+1];
+    size_t * offsets = HFFI_STRUCT_OFFSETS(p->type, p->count);
     void* target_ptr = (p->data + offsets[item->index]);
 
     switch (item->hffi_t) {
@@ -1022,6 +1022,11 @@ static void  __set_children_data_travel(hffi_struct* p,struct_item* item){
             __struct_set_children_data(stu);
         }
     }break;
+
+    case HFFI_TYPE_CLOSURE:{
+        ((void**)target_ptr)[0] = ((hffi_closure*)item->ptr)->func_ptr;
+    }break;
+
     }
 }
 //just set ptrs. no need set 'HFFI_TYPE_HARRAY' and 'HFFI_TYPE_STRUCT'.

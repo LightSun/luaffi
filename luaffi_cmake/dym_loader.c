@@ -138,6 +138,7 @@ static inline void __dym_delete_lib(dym_lib* lib, int checkFunc){
         return;
     }
     if(atomic_add(&lib->ref, -1) == 1){
+        //printf("------ start free lib ------\n");
         array_list_delete(lib->func_list, __func_release, NULL);
 #ifdef _WIN32
         FreeLibrary((HANDLE)lib->lib);
@@ -180,6 +181,7 @@ dym_func* dym_lib_get_function(dym_lib* lib, const char* func_name, int ref){
     if(ref){
         atomic_add(&lib->total_func_ref, 1);
     }
+    array_list_add(lib->func_list, func);
     return func;
 }
 

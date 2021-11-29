@@ -1075,7 +1075,7 @@ static int xffi_dym_lib_new(lua_State *L){
     luaL_checktype(L, -1, LUA_TSTRING);
     dym_lib* lib = dym_new_lib(luaL_checkstring(L, -1));
     if(lib == NULL){
-        return luaL_error(L, "load lib failed.");
+        return luaL_error(L, "load lib(%s) failed.", luaL_checkstring(L, -1));
     }
     push_ptr_dym_lib(L, lib);
     lua_pushvalue(L, -2);      // str, lib, str

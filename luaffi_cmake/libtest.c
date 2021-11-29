@@ -1,5 +1,6 @@
 
 #include <stdlib.h>
+#include <stdio.h>
 
 #ifndef sint8
 typedef signed char sint8;
@@ -36,6 +37,15 @@ typedef struct Libtest_struct1{
     sint8 s8;
 }Libtest_struct1;
 
+typedef int (*Test_cb1)(int a, int b);
+
+typedef struct Libtest_struct2{
+    double val;
+    Test_cb1 cb;
+    Libtest_struct1 str;
+    Libtest_struct1* str_ptr;
+}Libtest_struct2;
+
 int libtest_add_s8s32_s32(sint8 a, int b);
 
 int* libtest_add_s8s32_s32p(sint8 a, int b);
@@ -48,6 +58,9 @@ Libtest_struct1 libtest_struct_s_s(Libtest_struct1 s);
 Libtest_struct1* libtest_struct_sp_sp(Libtest_struct1* s);
 
 Libtest_struct1* libtest_struct_s_sp(Libtest_struct1 s);
+
+void libtest_closure_struct(Libtest_struct2* str);
+int libtest_closure_cb(int a, int b, Test_cb1 cb);
 
 //-----------------------------
 int libtest_add_s8s32_s32(sint8 a, int b){
@@ -94,4 +107,13 @@ Libtest_struct1* libtest_struct_s_sp(Libtest_struct1 s){
     str->s8 = s.s8 * 10;
     return str;
 }
-
+//-------------- test struct with closure ============
+void libtest_closure_struct(Libtest_struct2* str){
+    printf("libtest_closure_struct >>> val = %.3f\n", (float)str->val);
+    printf("libtest_closure_struct >>> cb = %p \n", str->cb);
+    printf("libtest_closure_struct >>> str.f = %.3f \n", str->str.f);
+    printf("libtest_closure_struct >>> str_ptr.f = %.3f \n", str->str_ptr->f);
+}
+int libtest_closure_cb(int a, int b, Test_cb1 cb){
+    return cb(a, b);
+}
