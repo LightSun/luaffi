@@ -273,7 +273,7 @@ harray* hlua_new_harray_from_table(lua_State* L, int idx, Func_get_ptr_struct fu
     if(count == 0) return NULL;
 
     //do build harray
-    array_list* list = array_list_new2(count * 4 / 3 + 1);
+    array_list* list = array_list_new_max(count);
     switch (lua_rawgeti(L, idx, 1)) {
     case LUA_TNUMBER: {
         lua_pop(L, 1);

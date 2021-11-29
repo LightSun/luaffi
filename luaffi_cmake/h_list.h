@@ -10,6 +10,7 @@ typedef struct array_list{
 
 #define array_list_new_simple() array_list_new(8, 0.75f)
 #define array_list_new2(init_count) array_list_new(init_count, 0.75f)
+#define array_list_new_max(count) array_list_new(count * 4 / 3 + 1, 0.75f)
 array_list* array_list_new(int init_count, float factor);
 
 /**

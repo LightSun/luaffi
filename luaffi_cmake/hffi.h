@@ -36,17 +36,18 @@ typedef struct hffi_value{
 //struct member type
 typedef struct hffi_smtype{
     int volatile ref;               // ref count
-    sint8 ffi_type;
-    void* _struct;                  //sometimes we may want put struct (hffi_struct*) directly.
-    void* _harray;                  //sometimes we may want put harray(harray*) directly.
+    sint8 hffi_type;
+    void* _ptr;                     //sometimes we may want put struct/array/closure directly.
     struct array_list*  elements;   //children types. element is hffi_smtype
 }hffi_smtype;
 
 typedef struct hffi_closure{
     ffi_closure* closure;
     void* func_ptr;             // function ptr
-    struct array_list* in_vals;
+    ffi_cif* cif;               // need cif . lifecycle is same with closure.
+    struct array_list* in_vals; // parameter values.
     hffi_value* ret_val;
+    sint8 abi;                  // the abi
     int volatile ref;           // ref count
 }hffi_closure;
 
@@ -190,6 +191,8 @@ hffi_smtype* hffi_new_smtype_struct(hffi_struct* _struct);
 hffi_smtype* hffi_new_smtype_struct_ptr(hffi_struct* _struct);
 hffi_smtype* hffi_new_smtype_harray(struct harray* array);
 hffi_smtype* hffi_new_smtype_harray_ptr(struct harray* array);
+
+hffi_smtype* hffi_new_smtype_closure(hffi_closure* closure);
 void hffi_delete_smtype(hffi_smtype* type);
 
 hffi_smtype* hffi_smtype_cpoy(hffi_smtype* src);
@@ -262,6 +265,7 @@ void* hffi_manager_alloc(hffi_manager*, int size);
 //------------------- closure --------------
 /**
  * @brief hffi_new_closure: create closure with concat function proxy.
+ * @param abi  the abi
  * @param fun_proxy  the function proxy as function-ptr
  * @param param_types the parameter values. must end with null.
  * @param return_type the return type
@@ -269,11 +273,13 @@ void* hffi_manager_alloc(hffi_manager*, int size);
  * @param msg the output error msg. can be null.
  * @return the struct of closure. or null if failed.
  */
-hffi_closure* hffi_new_closure(void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
+hffi_closure* hffi_new_closure(int abi, void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
                                struct array_list* in_vals, hffi_value* return_type, void* ud, char** msg);
+//return current ref count
 int hffi_delete_closure(hffi_closure* c);
 hffi_closure* hffi_closure_copy(hffi_closure* c);
 void hffi_closure_ref(hffi_closure* hc, int c);
+int hffi_closure_set_func_ptr(hffi_closure* hc, void* func_ptr);
 
 //---------------------- cif ------------------------
 hffi_cif* hffi_new_cif(int abi, struct array_list* in_vals, int var_count,hffi_value* out, char** msg);

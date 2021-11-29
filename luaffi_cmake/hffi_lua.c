@@ -720,6 +720,7 @@ static int xffi_struct_newindex(lua_State *L){
         }
         return luaL_error(L, "set struct(member) for struct failed.");
     }break;
+
     default:
         return luaL_error(L, "wrong struct type = %d", hs->hffi_types[index]);
     }
@@ -1116,6 +1117,7 @@ typedef struct FuncContext{
 static void __delete_FuncContext(FuncContext* fc){
     if(fc->closure){
         hffi_delete_closure(fc->closure);
+        fc->closure = NULL;
     }
     if(fc->ref_func != LUA_NOREF){
         luaL_unref(fc->L, HLUA_REF_ID_FUNC, fc->ref_func);
@@ -1145,17 +1147,25 @@ void Hffi_lua_func(ffi_cif* cif,void* ret,void** args,void* ud){
         push_ptr_hffi_value(L, tmp_val);
         lua_rawseti(L, -2, i + 1);
     }
-
+    //-----------------------
+#define __Hffi_lua_func_ret(hffi_t, type)\
+case hffi_t:{\
+    *(type*)ret = (type)lua_tointeger(L, -1);\
+}break;
     //ctx, tab(in_vals).
     int ret_call;
     if((ret_call = lua_pcall(L, 2, 1, 0)) == LUA_OK){
         switch (lua_type(L, -1)) {
         case LUA_TNUMBER:{
-            if(fc->closure->ret_val->base_ffi_type == HFFI_TYPE_FLOAT
-                    || fc->closure->ret_val->base_ffi_type == HFFI_TYPE_DOUBLE){
-                *(lua_Number*)ret = lua_tonumber(L, -1);
+            DEF_HFFI_BASE_SWITCH(__Hffi_lua_func_ret, fc->closure->ret_val->base_ffi_type)
+            if(fc->closure->ret_val->base_ffi_type == HFFI_TYPE_FLOAT){
+                *(float*)ret = (float)lua_tonumber(L, -1);
+            }else if(fc->closure->ret_val->base_ffi_type == HFFI_TYPE_DOUBLE){
+                *(double*)ret = (double)lua_tonumber(L, -1);
             }else{
-                *(lua_Integer*)ret = lua_tointeger(L, -1);
+                //*(lua_Integer*)ret = lua_tointeger(L, -1);
+                luaL_error(L, "support type for closure callback.");
+                return;
             }
         }break;
 
@@ -1223,18 +1233,20 @@ void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
                                struct array_list* in_vals, hffi_value* return_type, void* ud
 */
     //tab, func.
-    //tab: {a,b,c, ret = }
+    //tab: {a,b,c, ret = xx, ctx = xx}
     //func: ret type can be. number/hffi_value/hffi_struct/hffi_harray
     luaL_checktype(L, 1, LUA_TTABLE);
     luaL_checktype(L, 2, LUA_TFUNCTION);
 
     int type;
+    int abi = FFI_DEFAULT_ABI;
     int ref_ctx, ref_func = LUA_NOREF;
     //func
     ref_func = luaL_ref(L, HLUA_REF_ID_FUNC); // ref func and pop
     //ctx
     ref_ctx = hlua_get_ref(L, 1, "ctx", HLUA_REF_ID_CTX);
-
+    //abi
+    abi = hlua_get_int(L, 1, "abi", abi);
     //ret
     type = lua_getfield(L, 1, "ret");
     hffi_value* val_ret;
@@ -1267,30 +1279,32 @@ void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
     //tab
     int c = lua_rawlen(L, 1);
     //
-    array_list* in_vals = array_list_new2(c * 4 / 3 + 1);
+    array_list* in_vals = array_list_new_max(c);
+    hffi_value* tmp_val;
     for(int i = 0 ; i < c ; i ++){
         lua_rawgeti(L, 1, i + 1);
-        if(luaL_testudata(L, -1, __STR(hffi_value))){
-            array_list_add(in_vals, get_ptr_hffi_value(L, -1));
-        }else{
+        tmp_val = __get_value(L, -1);
+        if(tmp_val == NULL){
             goto failed;
         }
+        array_list_add(in_vals, tmp_val);
         lua_pop(L, 1);
     }
     //closure
-    hffi_closure* clo = hffi_new_closure(Hffi_lua_func, in_vals, val_ret, fc, NULL);
+    hffi_closure* clo = hffi_new_closure(abi, Hffi_lua_func, in_vals, val_ret, fc, NULL);
     hffi_closure_ref(clo, 1);
     fc->closure = clo;
     push_ptr_hffi_closure(L, clo);
     lua_pushlightuserdata(L, fc);
     lua_setuservalue(L, -2);
+    array_list_delete2(in_vals, list_travel_value_delete);
     if(val_ret != hffi_get_void_value()){
         hffi_delete_value(val_ret);
     }
     return 1;
 
     failed:
-    array_list_delete2(in_vals, NULL);
+    array_list_delete2(in_vals, list_travel_value_delete);
     __delete_FuncContext(fc);
     if(val_ret != hffi_get_void_value()){
         hffi_delete_value(val_ret);

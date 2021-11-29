@@ -1,3 +1,6 @@
+
+#include "atomic.h"
+
 #if defined(USE_C11_ATOMICS)
 #include <stdatomic.h>
 #endif
@@ -68,5 +71,22 @@ int atomic_get(int volatile *a)
     value = *a;
   } while (!atomic_cas(a, value, value));
   return value;
+#endif
+}
+
+void atomic_set(int volatile *a, int newvalue)
+{
+#if defined(USE_C11_ATOMICS)
+  atomic_store(a, newvalue);
+#elif defined(USE_MSC_ATOMICS)
+  assert(sizeof(int) == sizeof(long));
+  _InterlockedExchange((long*)a, newvalue);
+#elif defined(USE_GCC_ATOMICS)
+  __sync_lock_test_and_set(a, newvalue);
+#else
+  int oldvalue;
+  do {
+    oldvalue = *a;
+  } while (!atomic_cas(a, oldvalue, newvalue));
 #endif
 }
