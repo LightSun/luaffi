@@ -8,6 +8,8 @@ extern "C"{
 #include "ffi2.h"
 #include "hffi_lua.h"
 
+void libffi_test_closure_struct();
+
 void testCall();
 void testCall2();
 void testClosure();
@@ -15,6 +17,7 @@ void testClosure2();
 void testClosure3();
 
 void test_dymlib();
+void test_hffi_closure();
 
 void hffi_test1();
 void hffi_test2();
@@ -50,6 +53,7 @@ LUALIB_API void luaL_openlibs2(lua_State *L, const luaL_Reg funcs[]) {
 #define LUA_DIR "../luaffi_cmake/lua_script"
 
 static void test_ffi_all(){
+    libffi_test_closure_struct();
     test_harray();
     testCall();
     testCall2();
@@ -66,6 +70,7 @@ static void test_ffi_all(){
     hffi_test_value1(0, NULL);
 
     test_dymlib();
+    test_hffi_closure();
 }
 //int argc,char **argv
 extern "C" int main()

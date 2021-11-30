@@ -28,7 +28,7 @@ void calCircleArea(ffi_cif * cif,
                   float *ret,
                   void *args[],
                   FILE * ud) {
-    //input: float* --- float
+    //input: float*
     //args[0]: float** --- float*
     float pi = 3.14;
     float r = **(float **)args[0];

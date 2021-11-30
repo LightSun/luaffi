@@ -42,12 +42,14 @@ typedef struct hffi_smtype{
 }hffi_smtype;
 
 typedef struct hffi_closure{
+    //closure, cif, arg_types is same lifecycle.
     ffi_closure* closure;
+    ffi_cif* cif;               // need cif . 'arg_types' is in here.
+                                // ffi_type** arg_types;
+                                // argument types. this can't use temp var to save when we want use closure latter(without prepare again).
     void* func_ptr;             // function ptr
-    ffi_cif* cif;               // need cif . lifecycle is same with closure.
     struct array_list* in_vals; // parameter values.
-    hffi_value* ret_val;
-    sint8 abi;                  // the abi
+    hffi_value* ret_val;        // ret value
     int volatile ref;           // ref count
 }hffi_closure;
 

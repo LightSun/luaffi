@@ -18,12 +18,12 @@ endif(ext_libffi)
 
 if(gTest_enabled)
     #work
-    #include_directories(D:/study/github/thirds/googletest-release-1.11.0/googletest/include)
-    #set(gTest_lib_dir D:/study/github/thirds/googletest-release-1.11.0/googletest/build_out)
+    include_directories(D:/study/github/thirds/googletest-release-1.11.0/googletest/include)
+    set(gTest_lib_dir D:/study/github/thirds/googletest-release-1.11.0/googletest/build_out)
 
     #home
-    include_directories(D:/study/google/googletest-release-1.11.0/googletest/include)
-    SET(gTest_lib_dir D:/study/google/googletest-release-1.11.0/build_out/x64_mingw)
+    #include_directories(D:/study/google/googletest-release-1.11.0/googletest/include)
+    #SET(gTest_lib_dir D:/study/google/googletest-release-1.11.0/build_out/x64_mingw)
 
     #link_directories(${gTest_lib_dir}/release/libgtest.a)
     #set(gTest_libs gtest)
@@ -53,6 +53,7 @@ SET(SRC_HFFI
     h_list.c
     h_linklist.h
     h_linklist.c
+    hffi_pri.h
     hffi.h
     hffi.c
     hffi_common.c
@@ -70,6 +71,7 @@ SET(SRC_HFFI
     hffi_test_struct.c
     hffi_test_union.c
     libffi_study.c
+    libffi_test.c
     main.cpp
     )
 

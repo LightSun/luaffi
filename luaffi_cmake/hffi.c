@@ -8,6 +8,7 @@
 #include "h_array.h"
 #include "h_string.h"
 #include "h_float_bits.h"
+#include "hffi_pri.h"
 
 #define hffi_new_value_auto_x(ffi_t,type) \
 hffi_value* hffi_new_value_##type(type val){\
@@ -1924,14 +1925,14 @@ void* hffi_manager_alloc(hffi_manager* hm,int size){
 }
 
 //------------------------- closure impl ---------------------------------
-static inline int __prepare_closure_cif(hffi_closure* ptr, int abi,
-                                        void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
+static inline int __prepare_closure_cif(int abi,hffi_closure* ptr, void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
                                         void* ud, char** msg){
     //param
     int in_count = array_list_size(ptr->in_vals);
     ffi_type ** argTypes = NULL;
     if(in_count > 0){
-        argTypes = alloca(sizeof(ffi_type *) *in_count);
+        argTypes = MALLOC(sizeof (ffi_type *) * (in_count + 1));
+        argTypes[in_count] = NULL;
         for(int i = 0 ; i < in_count ; i ++){
             argTypes[i] = hffi_value_get_rawtype((hffi_value*)array_list_get(ptr->in_vals, i), msg);
             if(argTypes[i] == NULL){
@@ -1962,6 +1963,13 @@ static inline int __prepare_closure_cif(hffi_closure* ptr, int abi,
         return HFFI_STATE_FAILED;
     }
 }
+#define __CLOSURE__DEREF(val)\
+do{\
+volatile int* ref_ptr = (void*)val->closure + sizeof(ffi_closure);\
+if(atomic_add(ref_ptr, -1) == 1){\
+    ffi_closure_free(val->closure);\
+}\
+}while(0);
 
 hffi_closure* hffi_new_closure(int abi, void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
                                struct array_list* in_vals, hffi_value* val_return, void* ud, char** msg){
@@ -1981,13 +1989,13 @@ atomic_add(&val_return->ref, c);}
 
     hffi_closure* ptr = MALLOC(sizeof(hffi_closure));
     memset(ptr, 0, sizeof(hffi_closure));
-    ptr->cif = MALLOC(sizeof (ffi_cif));
-    ptr->ref = 1;
+    ptr->cif = MALLOC(sizeof (ffi_cif) + sizeof (int));
     ptr->in_vals = input_vals;
     ptr->ret_val = val_return;
-    ptr->abi = abi;
-    memset(ptr->cif, 0, sizeof (ffi_cif));
 
+    ptr->ref = 1;
+    //set ref for cif
+    HFFI_TAIL_INT_PTR_SET(ptr->cif, sizeof (ffi_cif), 1);
     //create closure, prepare
     ptr->closure = ffi_closure_alloc(sizeof(ffi_closure) + sizeof (int), &ptr->func_ptr);
     if(ptr->closure == NULL){
@@ -1996,32 +2004,35 @@ atomic_add(&val_return->ref, c);}
         }
         goto failed;
     }
-    int* ref_ptr = (void*)ptr->closure + sizeof(ffi_closure);
-    *ref_ptr = 1;
+    HFFI_TAIL_INT_PTR_SET(ptr->closure, sizeof(ffi_closure), 1);
 
-    if(__prepare_closure_cif(ptr, abi, fun_proxy, ud, msg) == HFFI_STATE_OK){
+    if(__prepare_closure_cif(abi, ptr, fun_proxy, ud, msg) == HFFI_STATE_OK){
         return ptr; //now we can call func
     }
     failed:
     hffi_delete_closure(ptr);
     return NULL;
 }
+
 int hffi_delete_closure(hffi_closure* val){
     int old = atomic_add(&val->ref, -1);
     if(old == 1){
         //cif's lifecycle is same with closure
-        volatile int* ref_ptr = (void*)val->closure + sizeof(ffi_closure);
-        if(atomic_add(ref_ptr, -1) == 1){
-             ffi_closure_free(val->closure);
-             FREE(val->cif);
+        if(val->closure != NULL){
+            __CLOSURE__DEREF(val)
         }
+        //cif with type is
+        HFFI_TAIL_INT_PTR_ADD_X(val->cif, sizeof (ffi_cif), -1, {
+            if(old == 1){
+                FREE(val->cif->arg_types);
+                FREE(val->cif);
+            }     })
         if(val->in_vals){
             array_list_delete2(val->in_vals, list_travel_value_delete);
         }
         if(val->ret_val){
             hffi_delete_value(val->ret_val);
         }
-        FREE(val->cif);
         FREE(val);
     }
     return old - 1;
@@ -2031,22 +2042,21 @@ int hffi_closure_set_func_ptr(hffi_closure* ptr, void* func_ptr){
     if(new_closure == NULL){
         return HFFI_STATE_FAILED;
     }
-    ptr->func_ptr = func_ptr;
+    HFFI_TAIL_INT_PTR_SET(new_closure, sizeof (ffi_closure), 1)
     //save some vars
     void* ud = ptr->closure->user_data;
     void* fun_proxy = ptr->closure->fun;
-    //free old closure and alloc new
-    volatile int* ref_ptr = (void*)ptr->closure + sizeof(ffi_closure);
-    int ref_count = atomic_get(ref_ptr);
-    ffi_closure_free(ptr->closure);
-    ptr->closure = new_closure;
-    ref_ptr = (void*)ptr->closure + sizeof(ffi_closure);
-    *ref_ptr = ref_count;
+
     //cif is alread prepared. only need closure.
-    //prepare closure
-    if (ffi_prep_closure_loc(ptr->closure, ptr->cif, fun_proxy, ud, ptr->func_ptr) == FFI_OK) {
+    //check prepare closure
+    if (ffi_prep_closure_loc(new_closure, ptr->cif, fun_proxy, ud, func_ptr) == FFI_OK) {
+        ptr->func_ptr = func_ptr;
+        //free old closure and set new
+        __CLOSURE__DEREF(ptr);
+        ptr->closure = new_closure;
         return HFFI_STATE_OK; //now we can call func
     }
+    ffi_closure_free(new_closure);
     return HFFI_STATE_FAILED;
 }
 hffi_closure* hffi_closure_copy(hffi_closure* c){
@@ -2060,12 +2070,14 @@ hffi_closure* hffi_closure_copy(hffi_closure* c){
     ptr->ret_val = hffi_value_copy(c->ret_val);
     ptr->closure = c->closure;
     ptr->func_ptr = c->func_ptr;
-    ptr->abi = c->abi;
+    ptr->cif = c->cif;
+
+    HFFI_TAIL_INT_PTR_ADD(c->closure, sizeof(ffi_closure), 1);
+    HFFI_TAIL_INT_PTR_ADD(c->cif, sizeof(ffi_cif), 1);
     int count = array_list_size(c->in_vals);
     for(int i = 0 ; i < count ; i ++){
         array_list_add(ptr->in_vals, hffi_value_copy((hffi_value*)array_list_get(c->in_vals, i)));
     }
-    ptr->cif = c->cif;
     return ptr;
 }
 void hffi_closure_ref(hffi_closure* hc, int c){
