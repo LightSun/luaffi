@@ -1298,17 +1298,13 @@ void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
     lua_pushlightuserdata(L, fc);
     lua_setuservalue(L, -2);
     array_list_delete2(in_vals, list_travel_value_delete);
-    if(val_ret != hffi_get_void_value()){
-        hffi_delete_value(val_ret);
-    }
+    hffi_delete_value(val_ret);
     return 1;
 
     failed:
     array_list_delete2(in_vals, list_travel_value_delete);
     __delete_FuncContext(fc);
-    if(val_ret != hffi_get_void_value()){
-        hffi_delete_value(val_ret);
-    }
+    hffi_delete_value(val_ret);
     return 0;
 }
 static int xffi_closure_gc(lua_State* L){

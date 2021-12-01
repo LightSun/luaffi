@@ -453,6 +453,9 @@ hffi_value* hffi_value_copy(hffi_value* val){
     return val_ptr;
 }
 void hffi_delete_value(hffi_value* val){
+    if(val == _val_void){//ignore void
+        return;
+    }
     int old = atomic_add(&val->ref, -1);
     if(old == 1){
        // printf("hffi_delete_value(will delete): addr = %p\n", val);
@@ -2101,7 +2104,8 @@ hffi_cif* hffi_new_cif(int abi,array_list* in_vals, int var_count,hffi_value* ou
     void **args = NULL;
     ffi_cif* cif = NULL;
     if(in_count > 0){
-        argTypes = alloca(sizeof(ffi_type *) *in_count);
+        //argTypes must in heap memory when cif is in heap memory.
+        argTypes = MALLOC(sizeof(ffi_type *) *in_count);
         args = MALLOC(sizeof(void *) *in_count);
         for(int i = 0 ; i < in_count ; i ++){
             val = array_list_get(in_vals, i);
@@ -2162,6 +2166,7 @@ void hffi_cif_ref(hffi_cif* hcif, int c){
 }
 void hffi_delete_cif(hffi_cif* hcif){
     if(atomic_add(&hcif->ref, -1) == 1){
+        FREE(hcif->cif->arg_types);
         FREE(hcif->cif);
         FREE(hcif->args);
         hffi_value* val;
