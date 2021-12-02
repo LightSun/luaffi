@@ -451,6 +451,8 @@ void hffi_delete_value(hffi_value* val){
             }else if(val->pointer_base_type == HFFI_TYPE_HARRAY){
                 harray* arr = val->ptr;
                 harray_delete(arr);
+            }else if(val->pointer_base_type == HFFI_TYPE_CLOSURE){
+                hffi_delete_closure((hffi_closure*)val->ptr);
             }else{
                 if(val->ptr !=NULL){
                     FREE(val->ptr);
@@ -488,6 +490,45 @@ int hffi_value_hasData(hffi_value* val){
     }
     return 1;
 }
+hffi_smtype* hffi_value_to_smtype(hffi_value* val){
+#define DEF_VALUE_TO_SMTYPE_BASE_IMPL(ffi_t, type)\
+case ffi_t:{\
+    return hffi_new_smtype(ffi_t);\
+}break;
+    DEF_HFFI_BASE_SWITCH(DEF_VALUE_TO_SMTYPE_BASE_IMPL, val->base_ffi_type)
+    switch (val->base_ffi_type) {
+        case HFFI_TYPE_HARRAY:{
+            harray* arr = val->ptr;
+            harray_ref(arr, 1);
+            return hffi_new_smtype_harray(arr);
+        }break;
+        case HFFI_TYPE_STRUCT:{
+            hffi_struct* c = val->ptr;
+            hffi_struct_ref(c, 1);
+            return hffi_new_smtype_struct(c);
+        }break;
+
+        case HFFI_TYPE_POINTER:{
+            if(val->pointer_base_type == HFFI_TYPE_STRUCT){
+                hffi_struct* c = val->ptr;
+                hffi_struct_ref(c, 1);
+                return hffi_new_smtype_struct_ptr(c);
+            }else if(val->pointer_base_type == HFFI_TYPE_HARRAY){
+                harray* arr = val->ptr;
+                harray_ref(arr, 1);
+                return hffi_new_smtype_harray_ptr(arr);
+            }else if(val->pointer_base_type == HFFI_TYPE_CLOSURE){
+                hffi_closure* clo = (hffi_closure*)val->ptr;
+                hffi_closure_ref(clo, 1);
+                return hffi_new_smtype_closure(clo);
+            }else{
+                return hffi_new_smtype(HFFI_TYPE_POINTER);
+            }
+        }break;
+    }
+    return NULL;
+}
+
 #define DEF_VALUE_GET_BASE_IMPL(ffi_t, type)\
 case ffi_t:{\
     *((type*)out_ptr) = *((type*)val->ptr);\

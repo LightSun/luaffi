@@ -159,6 +159,8 @@ int hffi_value_eq(hffi_value* val, hffi_value* val2);
 //--------- for test ----------
 int hffi_value_set_base(hffi_value* val, void* in_ptr);
 
+hffi_smtype* hffi_value_to_smtype(hffi_value* val);
+
 /**
  * @brief hffi_call: do call ffi.
  * @param in :  the input parameters. must end with NULL

@@ -18,13 +18,15 @@ typedef hffi_struct* (*Func_get_ptr_struct)(lua_State* L, int idx);
 typedef harray* (*Func_get_ptr_harray)(lua_State* L, int idx);
 typedef hffi_smtype* (*Func_get_ptr_smtype)(lua_State* L, int idx);
 typedef hffi_closure* (*Func_get_ptr_closure)(lua_State* L, int idx);
+typedef hffi_value* (*Func_get_ptr_value)(lua_State* L, int idx);
 typedef void(*Fun_delete)(void* data);
 
 harray* hlua_new_harray_from_table(lua_State* L, int idx, Func_get_ptr_struct func_struct, Func_get_ptr_harray func_harray);
 //build smtypes. return HFFI_STATE_OK if success.
 int build_smtypes(lua_State* L, array_list* sm_list, array_list* sm_names,
                    Func_get_ptr_struct func_struct, Func_get_ptr_harray func_harray,
-                  Func_get_ptr_smtype func_smtype, Func_get_ptr_closure func_clo);
+                  Func_get_ptr_smtype func_smtype, Func_get_ptr_closure func_clo,
+                  Func_get_ptr_value func_val);
 
 int hlua_get_int(lua_State* L, int idx, const char* key, int def_val);
 

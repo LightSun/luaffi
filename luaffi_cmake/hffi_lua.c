@@ -444,6 +444,7 @@ static const luaL_Reg g_hffi_smtype_Methods[] = {
 static int xffi_smtype_new(lua_State* L){
     //type/smtypes
     //harray/hffi_struct [, bool(ptr or not)]
+    //value
     switch (lua_type(L, 1)) {
     case LUA_TNUMBER:{
         return push_ptr_hffi_smtype(L, hffi_new_smtype((sint8)luaL_checkinteger(L, 1)));
@@ -478,6 +479,9 @@ static int xffi_smtype_new(lua_State* L){
             harray* hs = get_ptr_harray(L, 1);
             hffi_smtype* smtype = asPtr ? hffi_new_smtype_harray_ptr(hs) : hffi_new_smtype_harray(hs);
             return push_ptr_hffi_smtype(L, smtype);
+        }else if(luaL_testudata(L, 1, __STR(hffi_value))){
+            hffi_value* hs = get_ptr_hffi_value(L, 1);
+            return push_ptr_hffi_smtype(L, hffi_value_to_smtype(hs));
         }
     }break;
     }
@@ -522,7 +526,7 @@ static int xffi_struct_new(lua_State *L){
     array_list* sm_names = array_list_new_simple();
 
     if(build_smtypes(L, sm_list, sm_names, get_ptr_hffi_struct, get_ptr_harray,
-                     get_ptr_hffi_smtype, get_ptr_hffi_closure) == HFFI_STATE_FAILED){
+                     get_ptr_hffi_smtype, get_ptr_hffi_closure, get_ptr_hffi_value) == HFFI_STATE_FAILED){
         array_list_delete2(sm_list, list_travel_smtype_delete);
         array_list_delete2(sm_names, string_delete);
         return luaL_error(L, "build struct met unsupport data type.");

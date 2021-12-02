@@ -215,7 +215,8 @@ lua_pop(L, 1);
 
 int build_smtypes(lua_State* L, array_list* sm_list, array_list* sm_names,
                    Func_get_ptr_struct func_struct, Func_get_ptr_harray func_harray,
-                   Func_get_ptr_smtype func_smtype, Func_get_ptr_closure func_clo){
+                   Func_get_ptr_smtype func_smtype, Func_get_ptr_closure func_clo,
+                   Func_get_ptr_value func_val){
     int len = lua_rawlen(L, 1);
     int lua_t, asPtr;
     hffi_smtype* tmp_smtype;
@@ -247,6 +248,10 @@ int build_smtypes(lua_State* L, array_list* sm_list, array_list* sm_names,
             CHECK_NEXT_AS_STRING();
         }else if(luaL_testudata(L, -1, __STR(hffi_closure))){
             tmp_smtype = hffi_new_smtype_closure(func_clo(L, -1));
+            array_list_add(sm_list, tmp_smtype);
+            CHECK_NEXT_AS_STRING();
+        }else if(luaL_testudata(L, -1, __STR(hffi_value))){
+            tmp_smtype = hffi_value_to_smtype(func_val(L, -1));
             array_list_add(sm_list, tmp_smtype);
             CHECK_NEXT_AS_STRING();
         }
