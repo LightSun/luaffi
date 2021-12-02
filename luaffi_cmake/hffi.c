@@ -268,32 +268,6 @@ static inline ffi_type* __harray_to_ffi_type(int abi, harray* arr, array_list* s
     }
     return success ? type : NULL;
 }
-
-ffi_type* to_ffi_type(int8_t v, char** msg){
-#define hffi_TO_TYPE(t, v) case t:{ return &v;}
-    switch (v) {
-    hffi_TO_TYPE(HFFI_TYPE_POINTER, ffi_type_pointer)
-    hffi_TO_TYPE(HFFI_TYPE_SINT8, ffi_type_sint8)
-    hffi_TO_TYPE(HFFI_TYPE_UINT8, ffi_type_uint8)
-    hffi_TO_TYPE(HFFI_TYPE_SINT16, ffi_type_sint16)
-    hffi_TO_TYPE(HFFI_TYPE_UINT16, ffi_type_uint16)
-    hffi_TO_TYPE(HFFI_TYPE_UINT32, ffi_type_uint32)
-    hffi_TO_TYPE(HFFI_TYPE_SINT32, ffi_type_sint32)
-    hffi_TO_TYPE(HFFI_TYPE_INT, ffi_type_sint32)
-    hffi_TO_TYPE(HFFI_TYPE_UINT64, ffi_type_uint64)
-    hffi_TO_TYPE(HFFI_TYPE_SINT64, ffi_type_sint64)
-    hffi_TO_TYPE(HFFI_TYPE_FLOAT, ffi_type_float)
-    hffi_TO_TYPE(HFFI_TYPE_DOUBLE, ffi_type_double)
-    hffi_TO_TYPE(HFFI_TYPE_VOID, ffi_type_void)
-    }
-//#undef hffi_TO_TYPE
-    if(msg){
-        char str[32];
-        snprintf(str, 32, "unknwn ffi_type = %d", v);
-        strcpy(*msg, str);
-    }
-    return NULL;
-}
 //---------------------------------------------------------------
 //------------------------- value ------------------------
 hffi_value* hffi_new_value_ptr(sint8 hffi_t2){
@@ -626,6 +600,9 @@ harray* hffi_value_get_pointer_as_array(hffi_value* val, int rows, int cols,int 
     return hffi_get_pointer_as_array_impl(val->pointer_base_type, val->ptr, rows, cols, continue_mem, share_memory);
 }
 int hffi_value_eq(hffi_value* val, hffi_value* val2){
+    if(val == val2){
+        return HFFI_TRUE;
+    }
     if(val->base_ffi_type != val2->base_ffi_type || val->pointer_base_type != val2->pointer_base_type){
         return 1;
     }
@@ -1344,6 +1321,9 @@ hffi_struct* hffi_struct_copy(hffi_struct* _hs){
     return ptr;
 }
 int hffi_struct_eq(struct hffi_struct* hs1, struct hffi_struct* hs2){
+    if(hs1 == hs2){
+        return HFFI_TRUE;
+    }
     if(hs1->data_size != hs2->data_size || hs1->count != hs2->count) {
         return HFFI_STATE_FAILED;
     }

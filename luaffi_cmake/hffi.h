@@ -81,9 +81,6 @@ extern void list_travel_value_delete(void* d);
 extern void list_travel_hcif_delete(void* d);
 extern hffi_value* hffi_get_void_value();
 
-//error_msg can be null
-ffi_type* to_ffi_type(int8_t ffi_t, char** error_msg);
-
 //only alloc base needed memory.
 hffi_value* hffi_new_value_ptr(sint8 hffi_t2);
 /* create value. without data. that means the data will be allocate by an extra function. */

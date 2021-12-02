@@ -23,18 +23,19 @@ int hlua_get_ref(lua_State* L, int tab_id, const char* key, int t){
     tab_id = HLUA_ADJUST_ID(tab_id);
     int ref_ctx = LUA_NOREF;
     if(lua_getfield(L, tab_id, key) != LUA_TNIL){
-        ref_ctx = luaL_ref(L, t);
+        ref_ctx = luaL_ref(L, t); //auto pop
         lua_pushnil(L);
         lua_setfield(L, tab_id, key);
+    }else{
+        lua_pop(L, 1);
     }
-    lua_pop(L, 1);
     return ref_ctx;
 }
 
 int hlua_get_int(lua_State* L, int tab_id, const char* key, int def_val){
     tab_id = HLUA_ADJUST_ID(tab_id);
     int t = lua_getfield(L, tab_id, key);
-    if(t == LUA_TNUMBER){
+    if(t != LUA_TNIL && t == LUA_TNUMBER){
         def_val = luaL_checkinteger(L, -1);
         lua_pushnil(L);
         lua_setfield(L, tab_id, key);
@@ -213,7 +214,8 @@ if(lua_rawgeti(L, 1, i + 2) == LUA_TSTRING){\
 lua_pop(L, 1);
 
 int build_smtypes(lua_State* L, array_list* sm_list, array_list* sm_names,
-                   Func_get_ptr_struct func_struct, Func_get_ptr_harray func_harray, Func_get_ptr_smtype func_smtype){
+                   Func_get_ptr_struct func_struct, Func_get_ptr_harray func_harray,
+                   Func_get_ptr_smtype func_smtype, Func_get_ptr_closure func_clo){
     int len = lua_rawlen(L, 1);
     int lua_t, asPtr;
     hffi_smtype* tmp_smtype;
@@ -241,6 +243,10 @@ int build_smtypes(lua_State* L, array_list* sm_list, array_list* sm_names,
         }else if(luaL_testudata(L, -1, __STR(hffi_smtype))){
             tmp_smtype = func_smtype(L, -1);
             hffi_smtype_ref(tmp_smtype, 1);
+            array_list_add(sm_list, tmp_smtype);
+            CHECK_NEXT_AS_STRING();
+        }else if(luaL_testudata(L, -1, __STR(hffi_closure))){
+            tmp_smtype = hffi_new_smtype_closure(func_clo(L, -1));
             array_list_add(sm_list, tmp_smtype);
             CHECK_NEXT_AS_STRING();
         }

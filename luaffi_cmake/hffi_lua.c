@@ -521,8 +521,8 @@ static int xffi_struct_new(lua_State *L){
     array_list* sm_list = array_list_new_simple();
     array_list* sm_names = array_list_new_simple();
 
-    if(build_smtypes(L, sm_list, sm_names, get_ptr_hffi_struct,
-                     get_ptr_harray, get_ptr_hffi_smtype) == HFFI_STATE_FAILED){
+    if(build_smtypes(L, sm_list, sm_names, get_ptr_hffi_struct, get_ptr_harray,
+                     get_ptr_hffi_smtype, get_ptr_hffi_closure) == HFFI_STATE_FAILED){
         array_list_delete2(sm_list, list_travel_smtype_delete);
         array_list_delete2(sm_names, string_delete);
         return luaL_error(L, "build struct met unsupport data type.");
@@ -820,6 +820,9 @@ static int xffi_value_new(lua_State *L){
                 val = hffi_new_value_harray(get_ptr_harray(L, 1));
             }
             return push_ptr_hffi_value(L, val);
+        }else if(luaL_testudata(L, 1, __STR(hffi_closure))){
+            val = hffi_new_value_closure(get_ptr_hffi_closure(L, 1));
+            return push_ptr_hffi_value(L, val);
         }
     }break;
     case LUA_TSTRING:{
@@ -1104,8 +1107,6 @@ static inline hffi_value* __get_value(lua_State *L, int idx){
     }
 }
 //------------------- closure ----------------------
-#define HLUA_REF_ID_FUNC LUA_REGISTRYINDEX
-#define HLUA_REF_ID_CTX (LUA_REGISTRYINDEX - 1)
 #define HLUA_EXT_LEN 4
 typedef struct FuncContext{
     lua_State *L;
@@ -1120,23 +1121,25 @@ static void __delete_FuncContext(FuncContext* fc){
         fc->closure = NULL;
     }
     if(fc->ref_func != LUA_NOREF){
-        luaL_unref(fc->L, HLUA_REF_ID_FUNC, fc->ref_func);
+        luaL_unref(fc->L, LUA_REGISTRYINDEX, fc->ref_func);
     }
     if(fc->ref_ctx != LUA_NOREF){
-        luaL_unref(fc->L, HLUA_REF_ID_CTX, fc->ref_ctx);
+        luaL_unref(fc->L, LUA_REGISTRYINDEX, fc->ref_ctx);
     }
     FREE(fc);
 }
 
-void Hffi_lua_func(ffi_cif* cif,void* ret,void** args,void* ud){
+static void Hffi_lua_func(ffi_cif* cif,void* ret,void** args,void* ud){
     H_UNSED(cif);
     H_UNSED(ret);
     H_UNSED(args);
     //ret can be simple int/float. array. struct?
     FuncContext* fc = ud;
     lua_State *L = fc->L;
-    lua_rawgeti(L, HLUA_REF_ID_FUNC, fc->ref_func);
-    lua_rawgeti(L, HLUA_REF_ID_CTX, fc->ref_ctx);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, fc->ref_func);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, fc->ref_ctx);
+    printf("Hffi_lua_func dump1: >>> \n");
+    luaB_dumpStack(L);
     //tab as args
     lua_newtable(L);
     int c = array_list_size(fc->closure->in_vals);
@@ -1233,7 +1236,7 @@ void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
                                struct array_list* in_vals, hffi_value* return_type, void* ud
 */
     //tab, func.
-    //tab: {a,b,c, ret = xx, ctx = xx}
+    //tab: {a,b,c, ret = xx, ctx = xx, abi = xx}
     //func: ret type can be. number/hffi_value/hffi_struct/hffi_harray
     luaL_checktype(L, 1, LUA_TTABLE);
     luaL_checktype(L, 2, LUA_TFUNCTION);
@@ -1242,9 +1245,9 @@ void (*fun_proxy)(ffi_cif*,void* ret,void** args,void* ud),
     int abi = FFI_DEFAULT_ABI;
     int ref_ctx, ref_func = LUA_NOREF;
     //func
-    ref_func = luaL_ref(L, HLUA_REF_ID_FUNC); // ref func and pop
+    ref_func = luaL_ref(L, LUA_REGISTRYINDEX); // ref func and pop
     //ctx
-    ref_ctx = hlua_get_ref(L, 1, "ctx", HLUA_REF_ID_CTX);
+    ref_ctx = hlua_get_ref(L, 1, "ctx", LUA_REGISTRYINDEX);
     //abi
     abi = hlua_get_int(L, 1, "abi", abi);
     //ret

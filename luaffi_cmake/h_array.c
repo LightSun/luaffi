@@ -552,6 +552,9 @@ int harray_seti2(harray* arr, int index, void* ptr){
 }
 
 int harray_eq(harray* arr, harray* arr2){
+    if(arr == arr2){
+        return HFFI_TRUE;
+    }
     if(arr->hffi_t != arr2->hffi_t || arr->ele_count != arr2->ele_count
             || arr->data_size != arr2->data_size){
         return HFFI_STATE_FAILED;

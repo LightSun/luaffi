@@ -68,7 +68,7 @@ sint8,"s8";
 }
 input_struct.f = 9.6
 input_struct.u64 = 100
-input_struct.arr.set(0, {10, 20, 30}) -- 0,0,0???
+input_struct.arr.set(0, {10, 20, 30})
 print("input_struct.arr: ", input_struct.arr)
 input_struct.s8 = 10
 

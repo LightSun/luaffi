@@ -59,7 +59,9 @@ Libtest_struct1* libtest_struct_sp_sp(Libtest_struct1* s);
 
 Libtest_struct1* libtest_struct_s_sp(Libtest_struct1 s);
 
+//closure
 void libtest_closure_struct(Libtest_struct2* str);
+int libtest_struct_closure(int a, int b, Libtest_struct2* str);
 int libtest_closure_cb(int a, int b, Test_cb1 cb);
 
 //-----------------------------
@@ -112,8 +114,14 @@ void libtest_closure_struct(Libtest_struct2* str){
     printf("libtest_closure_struct >>> val = %.3f\n", (float)str->val);
     printf("libtest_closure_struct >>> cb = %p \n", str->cb);
     printf("libtest_closure_struct >>> str.f = %.3f \n", str->str.f);
+    printf("libtest_closure_struct >>> str.s8 = %d \n", str->str.s8);
     printf("libtest_closure_struct >>> str_ptr.f = %.3f \n", str->str_ptr->f);
+    printf("libtest_closure_struct >>> str_ptr.s8 = %d \n", str->str_ptr->s8);
 }
+int libtest_struct_closure(int a, int b, Libtest_struct2* str){
+    return str->cb(a, b);
+}
+
 int libtest_closure_cb(int a, int b, Test_cb1 cb){
     return cb(a, b);
 }
