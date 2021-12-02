@@ -66,15 +66,15 @@ local function createStruct2()
 	input_struct2.u64 = 100 * 10
 	input_struct2.arr.set(0, {100, 200, 300})
 	input_struct2.s8 = 10 * 10
-	local val_d = hffi.value(double, 1.58)
-	local val_closure = hffi.value(createClosure())
+	local clo = createClosure()
 	
 	local str2 = hffi.struct{
-		val_d, "val";
-		val_closure, "cb";
+		double, "val";
+		clo, "cb";
 		input_struct, "_struct";
 		input_struct2, true, "_struct";
 	}	
+	str2.val = 1.58;
 	return str2;
 end
 
@@ -88,31 +88,7 @@ local function test_closure_callback()
 end
 
 local function test_closure_struct()
-	-- build Libtest_struct1
-	local arr = hffi.array(sint16, 3);
-	local input_struct = hffi.struct{
-	float,"f";
-	uint64,"u64";
-	arr,"arr";
-	sint8,"s8";
-	}
-	input_struct.f = 9.6
-	input_struct.u64 = 100
-	input_struct.arr.set(0, {10, 20, 30})
-	input_struct.s8 = 10
-	
-	local arr2 = hffi.array(sint16, 3);
-	local input_struct2 = hffi.struct{
-	float,"f";
-	uint64,"u64";
-	arr2,"arr";
-	sint8,"s8";
-	}
-	input_struct2.f = 9.6 * 10
-	input_struct2.u64 = 100 * 10
-	input_struct2.arr.set(0, {100, 200, 300})
-	input_struct2.s8 = 10 * 10
-	local val_d = hffi.value(double, 1.58)
+	--createStruct2();
 end
 
 test_closure_callback();
