@@ -1142,8 +1142,10 @@ static void Hffi_lua_func(ffi_cif* cif,void* ret,void** args,void* ud){
     lua_State *L = fc->L;
     lua_rawgeti(L, LUA_REGISTRYINDEX, fc->ref_func);
     lua_rawgeti(L, LUA_REGISTRYINDEX, fc->ref_ctx);
-    printf("Hffi_lua_func dump1: >>> \n");
-    luaB_dumpStack(L);
+    if(0){
+        printf("Hffi_lua_func dump1: >>> \n");
+        luaB_dumpStack(L);
+    }
     //tab as args
     lua_newtable(L);
     int c = array_list_size(fc->closure->in_vals);
@@ -1323,8 +1325,36 @@ static int xffi_closure_gc(lua_State* L){
     }
     return 0;
 }
+static int xffi_closure_index(lua_State* L){
+    //tab, index
+    hffi_closure* clo = get_ptr_hffi_closure(L, 1);
+    if(lua_type(L, 2) == LUA_TSTRING){
+        const char* fun_name = lua_tostring(L, 2);
+        //array, str
+        if(strcmp("ret", fun_name) == 0){
+            hffi_value_ref(clo->ret_val, 1);
+            push_ptr_hffi_value(L, clo->ret_val);
+            return 1;
+        }
+        return luaL_error(L, "unsupport method('%s') for closure.", fun_name);
+    }
+    int index = luaL_checkinteger(L, 2);
+    //clo->in_vals
+    int size = array_list_size(clo->in_vals) ;
+    if(index < 0){
+        index = size + index;
+    }
+    if(index >= size){
+        return luaL_error(L, "index outOfRange('%d') for closure.", index);
+    }
+    hffi_value* val = array_list_get(clo->in_vals, index);
+    hffi_value_ref(val, 1);
+    return push_ptr_hffi_value(L, val);
+}
+
 static const luaL_Reg g_hffi_closure_Methods[] = {
     {"__gc", xffi_closure_gc},
+    {"__index", xffi_closure_index},
     {NULL, NULL}
 };
 //---------------------------- ffi -----------------------

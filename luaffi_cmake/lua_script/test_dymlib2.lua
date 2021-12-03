@@ -79,16 +79,26 @@ local function createStruct2()
 end
 
 local function test_closure_callback()
-	local val_closure = hffi.value(createClosure())
+	local clo = createClosure();
+	local val_closure = hffi.value(clo)
 
 	--- test 'libtest_closure_cb'
-	local res = libtest.libtest_closure_cb {ret = result; param1, param2, val_closure}
-	print("libtest_closure_cb call result >>>", res)
+	local res = libtest.libtest_closure_cb {ret = clo.ret; clo[0], clo[1], val_closure}
+	print("test_closure_callback >>> libtest_closure_cb call result >>>", res)
 	assert(res == hffi.value(int, 3))
 end
 
 local function test_closure_struct()
-	--createStruct2();
+	local struct2 = createStruct2();
+	libtest.libtest_closure_struct { struct2 }
+	
+	--
+	local param1 = hffi.value(int, 1)
+	local param2 = hffi.value(int, 2)
+	local result = hffi.value(int, 0)
+	local res = libtest.libtest_struct_closure {ret = result; param1, param2, struct2}
+	print("test_closure_struct >>> libtest_struct_closure call result >>>", res)
+	assert(res == hffi.value(int, 3))
 end
 
 test_closure_callback();

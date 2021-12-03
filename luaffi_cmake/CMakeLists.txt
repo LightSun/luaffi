@@ -7,7 +7,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 #cmake can build gTest
 SET(gTest_enabled true)
+#SET(ENV_HOME true)
 #SET(ext_libffi true)
+
 
 if(ext_libffi)
     include_directories(E:/study/tools/libffi-3.4.2/x86_64-w64-mingw32/include)
@@ -17,13 +19,15 @@ else(ext_libffi)
 endif(ext_libffi)
 
 if(gTest_enabled)
-    #work
-    #include_directories(D:/study/github/thirds/googletest-release-1.11.0/googletest/include)
-    #set(gTest_lib_dir D:/study/github/thirds/googletest-release-1.11.0/googletest/build_out)
-
-    #home
-    include_directories(D:/study/google/googletest-release-1.11.0/googletest/include)
-    SET(gTest_lib_dir D:/study/google/googletest-release-1.11.0/build_out/x64_mingw)
+    if(ENV_HOME)
+        #home
+        include_directories(D:/study/google/googletest-release-1.11.0/googletest/include)
+        SET(gTest_lib_dir D:/study/google/googletest-release-1.11.0/build_out/x64_mingw)
+    else(ENV_HOME)
+        #work
+        include_directories(D:/study/github/thirds/googletest-release-1.11.0/googletest/include)
+        set(gTest_lib_dir D:/study/github/thirds/googletest-release-1.11.0/googletest/build_out)
+    endif(ENV_HOME)
 
     #link_directories(${gTest_lib_dir}/release/libgtest.a)
     #set(gTest_libs gtest)
