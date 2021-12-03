@@ -21,6 +21,7 @@ void test_hffi_closure();
 
 void hffi_test1();
 void hffi_test2();
+void hffi_test3();
 void hffi_test_struct();
 void hffi_test_struct2();
 void hffi_test_struct3();
@@ -63,6 +64,7 @@ static void test_ffi_all(){
 
     hffi_test1();
     hffi_test2();
+    hffi_test3();
     hffi_test_struct();
     hffi_test_struct2();
     hffi_test_struct3();

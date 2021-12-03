@@ -14,6 +14,30 @@ int testFunc2_1(int* m, int n){
     *m =1;
     return n;
 }
+
+int testFunc2_3(){
+    return 5;
+}
+void hffi_test3(){
+    printf("--- hffi_test3 ---\n");
+    void* func = testFunc2_3;
+
+    hffi_value* out = hffi_new_value_int(0);
+    int r = hffi_call(func, NULL, 0, out, NULL);
+    if(r == HFFI_STATE_OK){
+        int out_ptr = 0;
+        int out_r = hffi_value_get_int(out, &out_ptr);
+        if(out_r == HFFI_STATE_OK){
+            assert(out_ptr == 5);
+        }else{
+            printf("hffi_test3: get value out failed.\n");
+        }
+    }else{
+        printf("--------- call failed -------\n");
+    }
+    printf("--- end hffi_test3 ---\n");
+}
+
 void hffi_test2(){
     printf("--------- hffi_test2 -------\n");
     int a = 5;
@@ -43,7 +67,7 @@ void hffi_test2(){
     char* msg[1];
     msg[0] = _m;
     int r = hffi_call(func, arr, 0, out, msg);
-    if(r == 0){
+    if(r == HFFI_STATE_OK){
         int out_ptr;
         int out_r = hffi_value_get_int(out, &out_ptr);
         if(out_r == 0){

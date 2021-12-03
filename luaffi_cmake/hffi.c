@@ -276,11 +276,15 @@ hffi_value* hffi_new_value_ptr(sint8 hffi_t2){
 hffi_value* hffi_new_value(sint8 hffi_t, sint8 hffi_t2, int size){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
-    val_ptr->ptr = MALLOC(size);
     val_ptr->base_ffi_type = hffi_t;
     val_ptr->pointer_base_type = hffi_t2;
     val_ptr->ref = 1;   
-    memset(val_ptr->ptr, 0, size);
+    if(size > 0){
+        val_ptr->ptr = MALLOC(size);
+        memset(val_ptr->ptr, 0, size);
+    }else{
+        val_ptr->ptr = NULL;
+    }
     return val_ptr;
 }
 hffi_value* hffi_new_value_ptr_nodata(sint8 hffi_t2){

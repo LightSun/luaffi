@@ -1000,7 +1000,7 @@ static int xffi_dym_func_call(lua_State* L){
     lua_pop(L, 1);//pop ret.
     //params
     hffi_value* val;
-    array_list* params = array_list_new(12, 0.75f);
+    array_list* params = array_list_new_max(len > 2 ? len : 2);
     for(int i = 0 ;i < len ; i ++){
         lua_rawgeti(L, tab_idx, i+1);
         //type: int, struct, value?
@@ -1079,10 +1079,17 @@ static const luaL_Reg g_dym_lib_Methods[] = {
 };
 
 static int xffi_dym_lib_new(lua_State *L){
-    luaL_checktype(L, -1, LUA_TSTRING);
-    dym_lib* lib = dym_new_lib(luaL_checkstring(L, -1));
-    if(lib == NULL){
-        return luaL_error(L, "load lib(%s) failed.", luaL_checkstring(L, -1));
+    dym_lib* lib;
+    if(lua_gettop(L) == 2){
+        lib = dym_new_lib2(luaL_checkstring(L, 1), luaL_checkstring(L, 2));
+        if(lib == NULL){
+            return luaL_error(L, "load lib(%s, %s) failed.", lua_tostring(L, 1), lua_tostring(L, 2));
+        }
+    }else{
+        lib = dym_new_lib(luaL_checkstring(L, 1));
+        if(lib == NULL){
+            return luaL_error(L, "load lib(%s) failed.", luaL_checkstring(L, -1));
+        }
     }
     push_ptr_dym_lib(L, lib);
     lua_pushvalue(L, -2);      // str, lib, str

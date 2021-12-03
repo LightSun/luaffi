@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 #cmake can build gTest
 SET(gTest_enabled true)
-#SET(ENV_HOME true)
+SET(ENV_HOME true)
 #SET(ext_libffi true)
 
 
@@ -96,7 +96,7 @@ if(gTest_enabled)
     target_link_libraries(luaffi_app ${gTest_libs})
 endif()
 #target_compile_definitions(luaffi_app PRIVATE X86_WIN64)
-#add_compile_definitions(X86_64)
+add_compile_definitions(X86_64)
 
 #--------- add test lib ------
 add_library(test_hffi SHARED libtest.c)

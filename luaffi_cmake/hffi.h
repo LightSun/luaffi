@@ -14,8 +14,10 @@ int hffi_value_get_##t(hffi_value* val, t* out_ptr);
 
 #define hffi_get_pointer_count(n, p)\
 int n = 0;\
-while(p[n] != NULL){\
-    n++;\
+if(p != NULL){\
+    while(p[n] != NULL){\
+        n++;\
+    }\
 }
 
 struct linklist_node;
