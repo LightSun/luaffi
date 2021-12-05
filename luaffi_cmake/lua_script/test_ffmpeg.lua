@@ -129,7 +129,7 @@ local data = hffi.valuePtr(void)
 local AV_NOPTS_VALUE = hffi.value(sint64, 0x8000000000000000)
 local ZERO = hffi.value(int, 0)
 local offset = 0;
-while(1) do
+while(true) do
 	_ret = c_runtime.feof({ret = val_int, f}).get()
 	print("c_runtime.feof: result: "..tostring(_ret))
 	if(_ret == 0) then
