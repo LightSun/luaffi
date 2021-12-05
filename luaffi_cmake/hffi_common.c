@@ -4,7 +4,7 @@
 #include "h_list.h"
 #include "h_string.h"
 
-ffi_type* to_ffi_type(int8_t v, char** msg){
+ffi_type* hffi_to_ffi_type(int8_t v, char** msg){
 #define hffi_TO_TYPE(t, v) case t:{ return &v;}
     switch (v) {
     hffi_TO_TYPE(HFFI_TYPE_POINTER, ffi_type_pointer)
@@ -28,6 +28,24 @@ ffi_type* to_ffi_type(int8_t v, char** msg){
         strcpy(msg[0], str);
     }
     return NULL;
+}
+
+int hffi_is_base_type(sint8 ffi_t){
+    switch (ffi_t) {
+    case HFFI_TYPE_SINT8:
+    case HFFI_TYPE_UINT8:
+    case HFFI_TYPE_SINT16:
+    case HFFI_TYPE_UINT16:
+    case HFFI_TYPE_SINT32:
+    case HFFI_TYPE_UINT32:
+    case HFFI_TYPE_SINT64:
+    case HFFI_TYPE_UINT64:
+    case HFFI_TYPE_FLOAT:
+    case HFFI_TYPE_DOUBLE:
+    case HFFI_TYPE_INT:
+        return 1;
+    }
+    return 0;
 }
 
 int hffi_base_type_size(sint8 hffi_t){

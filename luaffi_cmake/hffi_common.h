@@ -239,7 +239,8 @@ void hffi_struct_sync_data_i(struct hffi_struct* arr, int index, void* ptr);
 //-------------------------
 extern void list_travel_value_dump(void* d, struct hstring* hs);
 //error_msg can be null
-ffi_type* to_ffi_type(int8_t ffi_t, char** error_msg);
+ffi_type* hffi_to_ffi_type(sint8 ffi_t, char** error_msg);
+int hffi_is_base_type(sint8 ffi_t);
 
 int hffi_base_type_size(sint8 hffi_t);
 void array_list_dump(struct array_list* list, struct hstring* hs, void(*func)(void* ele, struct hstring* hs));

@@ -23,7 +23,7 @@ int hffi_value_get_##t(hffi_value* val, t* out_ptr){\
     char _m[128];\
     char* msg[1];\
     msg[0] = _m;\
-    ffi_type* ft = to_ffi_type(val->base_ffi_type, msg);\
+    ffi_type* ft = hffi_to_ffi_type(val->base_ffi_type, msg);\
     if(ft != NULL && ft->size >= sizeof(t)){\
        if(ft->size >= sizeof(t)){\
           *out_ptr = *((t*)val->ptr);\
@@ -112,7 +112,7 @@ static void __release_struct_item(void* d){
     }
     FREE(item);
 }
-static int __struct_find_struct_harray(void* ud,int size, int index,void* ele){
+static int __struct_find_child(void* ud,int size, int index,void* ele){
     H_UNSED2(size, index)
     int req_index = *((int*)ud);
     struct_item* item = ele;
@@ -248,7 +248,7 @@ static inline ffi_type* __harray_to_ffi_type(int abi, harray* arr, array_list* s
     default:
     {
         //https://github.com/libffi/libffi/issues/394, not work(test on windows).
-        ffi_type* sub_type = to_ffi_type(arr->hffi_t, NULL);
+        ffi_type* sub_type = hffi_to_ffi_type(arr->hffi_t, NULL);
         type = MALLOC(HFFI_STRUCT_TYPE_SIZE(c));
         type->type = FFI_TYPE_STRUCT;
         type->alignment = type->size = 0;
@@ -279,6 +279,7 @@ hffi_value* hffi_new_value(sint8 hffi_t, sint8 hffi_t2, int size){
     val_ptr->base_ffi_type = hffi_t;
     val_ptr->pointer_base_type = hffi_t2;
     val_ptr->ref = 1;   
+    val_ptr->should_release_ptr = 1;
     if(size > 0){
         val_ptr->ptr = MALLOC(size);
         memset(val_ptr->ptr, 0, size);
@@ -291,10 +292,10 @@ hffi_value* hffi_new_value_ptr_nodata(sint8 hffi_t2){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
     val_ptr->ptr = NULL;
-    //val_ptr->multi_level_ptr = 1;
     val_ptr->base_ffi_type = HFFI_TYPE_POINTER;
     val_ptr->pointer_base_type = hffi_t2;
     val_ptr->ref = 1;
+    val_ptr->should_release_ptr = 1;
     return val_ptr;
 }
 
@@ -340,6 +341,7 @@ hffi_value* hffi_new_value_raw_type(sint8 ffi_t){
 hffi_value* hffi_new_value_struct(hffi_struct* c){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
+    val_ptr->should_release_ptr = 1;
     val_ptr->ptr = c;
     val_ptr->base_ffi_type = HFFI_TYPE_STRUCT;
     val_ptr->pointer_base_type = HFFI_TYPE_VOID;
@@ -350,6 +352,7 @@ hffi_value* hffi_new_value_struct(hffi_struct* c){
 hffi_value* hffi_new_value_struct_ptr(hffi_struct* c){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
+    val_ptr->should_release_ptr = 1;
     val_ptr->ptr = c;
     val_ptr->base_ffi_type = HFFI_TYPE_POINTER;
     val_ptr->pointer_base_type = HFFI_TYPE_STRUCT;
@@ -360,6 +363,7 @@ hffi_value* hffi_new_value_struct_ptr(hffi_struct* c){
 hffi_value* hffi_new_value_harray_ptr(harray* c){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
+    val_ptr->should_release_ptr = 1;
     val_ptr->ptr = c;
     val_ptr->base_ffi_type = HFFI_TYPE_POINTER;
     val_ptr->pointer_base_type = HFFI_TYPE_HARRAY;
@@ -370,6 +374,7 @@ hffi_value* hffi_new_value_harray_ptr(harray* c){
 hffi_value* hffi_new_value_closure(hffi_closure* c){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
+    val_ptr->should_release_ptr = 1;
     val_ptr->ptr = c;
     val_ptr->base_ffi_type = HFFI_TYPE_POINTER;
     val_ptr->pointer_base_type = HFFI_TYPE_CLOSURE;
@@ -379,6 +384,7 @@ hffi_value* hffi_new_value_closure(hffi_closure* c){
 }
 hffi_value* hffi_new_value_harray(struct harray* arr){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
+    val_ptr->should_release_ptr = 1;
     val_ptr->sub_types = array_list_new2(4);
     val_ptr->ffi_type = __harray_to_ffi_type(FFI_DEFAULT_ABI, arr, val_ptr->sub_types);
     val_ptr->ptr = arr;
@@ -397,7 +403,16 @@ hffi_value* hffi_value_copy(hffi_value* val){
     val_ptr->base_ffi_type = val->base_ffi_type;
     val_ptr->pointer_base_type = val->pointer_base_type;
     val_ptr->ref = 1;
-    val_ptr->multi_level_ptr = val->multi_level_ptr;
+    val_ptr->should_release_ptr = 1;
+
+#define hffi_value_copy_IMPL(ffi_t, type)\
+case ffi_t:{\
+    val_ptr->ptr = MALLOC(sizeof(type));\
+    *(type*)val_ptr->ptr = *(type*)val->ptr;\
+    ptr_set = 1;\
+}break;
+    int ptr_set = 0;
+    DEF_HFFI_BASE_SWITCH(hffi_value_copy_IMPL, val->base_ffi_type)
 
     switch (val->base_ffi_type) {
     case HFFI_TYPE_HARRAY:{
@@ -416,16 +431,16 @@ hffi_value* hffi_value_copy(hffi_value* val){
         }else if(val->pointer_base_type == HFFI_TYPE_CLOSURE){
             val_ptr->ptr = hffi_closure_copy((hffi_closure*)val->ptr);
         }else{
-            if(val->ptr != NULL){
-                val_ptr->ptr = MALLOC(sizeof (void*));
-                memcpy(val_ptr->ptr, val->ptr, sizeof (void*));
+            if(!ptr_set && val->ptr != NULL){
+                val_ptr->ptr = val->ptr;
+                val_ptr->should_release_ptr = 0;
             }
         }
     }break;
     default:
-        if(val->ptr != NULL){
-            val_ptr->ptr = MALLOC(sizeof (void*));
-            memcpy(val_ptr->ptr, val->ptr, sizeof (void*));
+        if(!ptr_set && val->ptr != NULL){
+            val_ptr->ptr = val->ptr;
+            val_ptr->should_release_ptr = 0;
         }
     }
     return val_ptr;
@@ -458,14 +473,16 @@ void hffi_delete_value(hffi_value* val){
             }else if(val->pointer_base_type == HFFI_TYPE_CLOSURE){
                 hffi_delete_closure((hffi_closure*)val->ptr);
             }else{
-                if(val->ptr !=NULL){
+                if(val->ptr !=NULL && val->should_release_ptr){
                     FREE(val->ptr);
                 }
             }
         }break;
 
         default:
-            if(val->ptr !=NULL){
+            // for 'base_ffi_type' = pointer, 'pointer_base_type' = void.
+            // that means the ptr is alloc by others. here will not free it.
+            if(val->ptr !=NULL && val->should_release_ptr){
                 FREE(val->ptr);
             }
         }
@@ -493,6 +510,17 @@ int hffi_value_hasData(hffi_value* val){
         return arr->data != NULL;
     }
     return 1;
+}
+int hffi_value_add(hffi_value* val, void* ptr){
+#define DEF_hffi_value_add_IMPL(ffi_t, type) \
+case ffi_t:{\
+    type old = *(type*)val->ptr;\
+    old += *(type*)ptr;\
+    *(type*)val->ptr = old;\
+    return HFFI_STATE_OK; \
+}break;
+    DEF_HFFI_BASE_SWITCH(DEF_hffi_value_add_IMPL, val->base_ffi_type)
+    return HFFI_STATE_FAILED;
 }
 hffi_smtype* hffi_value_to_smtype(hffi_value* val){
 #define DEF_VALUE_TO_SMTYPE_BASE_IMPL(ffi_t, type)\
@@ -620,7 +648,7 @@ ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg){
         }
         return val->ffi_type;
     }
-    return to_ffi_type(val->base_ffi_type, msg);
+    return hffi_to_ffi_type(val->base_ffi_type, msg);
 }
 hffi_struct* hffi_value_get_struct(hffi_value* val){
     if(val->base_ffi_type == HFFI_TYPE_STRUCT){
@@ -1191,7 +1219,7 @@ static inline hffi_struct* hffi_new_struct_from_list0(int abi,struct array_list*
         }break;
 
         default:{
-            tmp_type = to_ffi_type(tmp_smtype->hffi_type, msg);
+            tmp_type = hffi_to_ffi_type(tmp_smtype->hffi_type, msg);
             if(tmp_type == NULL){
                 goto failed;
             }
@@ -1333,7 +1361,7 @@ hffi_struct* hffi_struct_copy(hffi_struct* _hs){
             src_idx ++;
         }break;
         default:
-            tmp_type = to_ffi_type(_hs->hffi_types[i], NULL);
+            tmp_type = hffi_to_ffi_type(_hs->hffi_types[i], NULL);
             break;
         }
         type->elements[i] = tmp_type;
@@ -1409,8 +1437,8 @@ case ffi_t:{\
         DEF_HFFI_BASE_SWITCH(DEF_STRUCT_DATA_EQ_CASE, hs1->hffi_types[i])
         switch (hs1->hffi_types[i]) {
             case HFFI_TYPE_STRUCT:{
-                item1 = array_list_find(hs1->children, __struct_find_struct_harray, &i);
-                item2 = array_list_find(hs2->children, __struct_find_struct_harray, &i);
+                item1 = array_list_find(hs1->children, __struct_find_child, &i);
+                item2 = array_list_find(hs2->children, __struct_find_child, &i);
                 if(((hffi_struct*)item1->ptr)->data_size != ((hffi_struct*)item2->ptr)->data_size){
                     return HFFI_STATE_FAILED;
                 }
@@ -1422,15 +1450,15 @@ case ffi_t:{\
             }break;
             case HFFI_TYPE_HARRAY_PTR:
             case HFFI_TYPE_STRUCT_PTR:{
-                item1 = array_list_find(hs1->children, __struct_find_struct_harray, &i);
-                item2 = array_list_find(hs2->children, __struct_find_struct_harray, &i);
+                item1 = array_list_find(hs1->children, __struct_find_child, &i);
+                item2 = array_list_find(hs2->children, __struct_find_child, &i);
                 if(__struct_item_eq(item1, item2) != HFFI_STATE_OK){
                     return HFFI_STATE_FAILED;
                 }
             }break;
             case HFFI_TYPE_HARRAY:{
-                item1 = array_list_find(hs1->children, __struct_find_struct_harray, &i);
-                item2 = array_list_find(hs2->children, __struct_find_struct_harray, &i);
+                item1 = array_list_find(hs1->children, __struct_find_child, &i);
+                item2 = array_list_find(hs2->children, __struct_find_child, &i);
                 if(((harray*)item1->ptr)->data_size != ((harray*)item2->ptr)->data_size){
                     return HFFI_STATE_FAILED;
                 }
@@ -1497,13 +1525,29 @@ void* hffi_struct_get_data(struct hffi_struct* c){
 int hffi_struct_get_data_size(struct hffi_struct* c){
     return c->data_size;
 }
+void* hffi_struct_get_pointer(hffi_struct* hs, int index){
+    if(hs->hffi_types[index] != HFFI_TYPE_POINTER) return NULL;
+    size_t * offsets = HFFI_STRUCT_OFFSETS(hs->type, hs->count);
+    return hs->data + offsets[index];
+}
+hffi_value* hffi_struct_to_ptr_value(hffi_struct* hs, int index, int target_ffi_t){
+    if(index >= hs->count || hs->hffi_types[index] != target_ffi_t){
+        return NULL;
+    }
+    size_t * offsets = HFFI_STRUCT_OFFSETS(hs->type, hs->count);
+    void* data_ptr = hs->data + offsets[index];
+    hffi_value* val = hffi_new_value_ptr_nodata(target_ffi_t);
+    val->ptr = &data_ptr;
+    val->should_release_ptr = 0;
+    return val;
+}
 
 hffi_struct* hffi_struct_get_struct(hffi_struct* hs, int index){
     if(index >= hs->count) return NULL;
     int ffi_t = hs->hffi_types[index];
     hffi_struct* hstr;
     if(ffi_t == HFFI_TYPE_STRUCT || ffi_t == HFFI_TYPE_STRUCT_PTR){
-        struct_item* item = array_list_find(hs->children, __struct_find_struct_harray, &index);
+        struct_item* item = array_list_find(hs->children, __struct_find_child, &index);
         if(item == NULL){
             return NULL;
         }
@@ -1513,7 +1557,7 @@ hffi_struct* hffi_struct_get_struct(hffi_struct* hs, int index){
     }
     if(ffi_t == HFFI_TYPE_STRUCT && hs->data){
         //need sync data.
-        size_t * offsets = (size_t *) &hs->type->elements[hs->count+1];
+        size_t * offsets = HFFI_STRUCT_OFFSETS(hs->type, hs->count);
         void* data_ptr = hs->data + offsets[index];
         memcpy(hstr->data, data_ptr, hstr->data_size);
     }
@@ -1524,7 +1568,7 @@ struct harray* hffi_struct_get_harray(hffi_struct* hs, int index){
     int ffi_t = hs->hffi_types[index];
     harray* hstr;
     if(ffi_t == HFFI_TYPE_HARRAY || ffi_t == HFFI_TYPE_HARRAY_PTR){
-        struct_item* item = array_list_find(hs->children, __struct_find_struct_harray, &index);
+        struct_item* item = array_list_find(hs->children, __struct_find_child, &index);
         if(item == NULL){
             return NULL;
         }
@@ -1610,6 +1654,15 @@ harray* hffi_struct_get_as_array(hffi_struct* hs, int index, sint8 type,int rows
 }
 
 int hffi_struct_set_all(struct hffi_struct* hs, void* ptr){
+    size_t * offsets = HFFI_STRUCT_OFFSETS(hs->type, hs->count);
+    int count = array_list_size(hs->children);
+
+    if(!ptr){
+        //null.
+         hs->data = NULL;
+         hs->parent_pos = HFFI_STRUCT_NO_DATA;
+         return HFFI_STATE_OK;
+    }
     if(!hs->data){
         hs->data = ptr;
     }else{
@@ -1619,8 +1672,6 @@ int hffi_struct_set_all(struct hffi_struct* hs, void* ptr){
     if(hs->parent_pos == HFFI_STRUCT_NO_DATA){
         hs->parent_pos = HFFI_STRUCT_NO_PARENT;
     }
-    size_t * offsets = HFFI_STRUCT_OFFSETS(hs->type, hs->count);
-    int count = array_list_size(hs->children);
 
     struct_item* tmp_item;
     void* data_ptr;
@@ -1677,7 +1728,7 @@ int hffi_struct_set_harray(hffi_struct* hs, int index, struct harray* arr){
 //        if((int)hs->type->elements[index]->size != arr->data_size){
 //            return HFFI_STATE_FAILED;
 //        }
-        struct_item* item = array_list_find(hs->children, __struct_find_struct_harray, &index);
+        struct_item* item = array_list_find(hs->children, __struct_find_child, &index);
         if(item != NULL){
             harray* old_arr = item->ptr;
             if(old_arr->data_size != arr->data_size){
@@ -1695,7 +1746,7 @@ int hffi_struct_set_harray(hffi_struct* hs, int index, struct harray* arr){
             return HFFI_STATE_OK;
         }
     }else if(ffi_t == HFFI_TYPE_HARRAY_PTR){
-        struct_item* item = array_list_find(hs->children, __struct_find_struct_harray, &index);
+        struct_item* item = array_list_find(hs->children, __struct_find_child, &index);
         if(item != NULL){
             harray_ref(arr, 1);
             ((void**)data_ptr)[0] = arr;
@@ -1719,7 +1770,7 @@ int hffi_struct_set_struct(hffi_struct* hs, int index, hffi_struct* arr){
 //        if((int)hs->type->elements[index]->size != arr->data_size){
 //            return HFFI_STATE_FAILED;
 //        }
-        struct_item* item = array_list_find(hs->children, __struct_find_struct_harray, &index);
+        struct_item* item = array_list_find(hs->children, __struct_find_child, &index);
         if(item != NULL){
             hffi_struct* old_arr = item->ptr;
             if(old_arr->data_size != arr->data_size){
@@ -1736,7 +1787,7 @@ int hffi_struct_set_struct(hffi_struct* hs, int index, hffi_struct* arr){
             return HFFI_STATE_OK;
         }
     }else if(ffi_t == HFFI_TYPE_HARRAY_PTR){
-        struct_item* item = array_list_find(hs->children, __struct_find_struct_harray, &index);
+        struct_item* item = array_list_find(hs->children, __struct_find_child, &index);
         if(item != NULL){
             ((void**)data_ptr)[0] = arr;
             hffi_struct_ref(arr, 1);
@@ -1843,7 +1894,7 @@ void hffi_struct_sync_data(struct hffi_struct* hs, int reverse){
     for(int i = 0 ; i < hs->count ; i ++){
         switch (hs->hffi_types[i]) {
         case HFFI_TYPE_STRUCT:{
-            item = array_list_find(hs->children, __struct_find_struct_harray, &i);
+            item = array_list_find(hs->children, __struct_find_child, &i);
             if(item != NULL){
                 data_ptr = hs->data + offsets[i];
                 if(reverse){
@@ -1858,7 +1909,7 @@ void hffi_struct_sync_data(struct hffi_struct* hs, int reverse){
             }
         }break;
         case HFFI_TYPE_HARRAY:{
-            item = array_list_find(hs->children, __struct_find_struct_harray, &i);
+            item = array_list_find(hs->children, __struct_find_child, &i);
             if(item != NULL){
                 data_ptr = hs->data + offsets[i];
                 if(reverse){
@@ -1882,7 +1933,7 @@ void hffi_struct_sync_data_i(struct hffi_struct* hs, int i, void* ptr){
     void* data_ptr;
     switch (hs->hffi_types[i]) {
     case HFFI_TYPE_STRUCT:{
-        item = array_list_find(hs->children, __struct_find_struct_harray, &i);
+        item = array_list_find(hs->children, __struct_find_child, &i);
         if(item != NULL){
             assert(item->ptr == ptr);
             data_ptr = hs->data + offsets[i];
@@ -1891,7 +1942,7 @@ void hffi_struct_sync_data_i(struct hffi_struct* hs, int i, void* ptr){
         }
     }break;
     case HFFI_TYPE_HARRAY:{
-        item = array_list_find(hs->children, __struct_find_struct_harray, &i);
+        item = array_list_find(hs->children, __struct_find_child, &i);
         if(item != NULL){
             assert(item->ptr == ptr);
             data_ptr = hs->data + offsets[i];

@@ -30,6 +30,8 @@
 # define OS_BSD
 #elif defined unix || defined __unix__ || defined __unix || defined _POSIX_VERSION || defined _XOPEN_VERSION
 # define OS_POSIX
+#elif defined ANDROID || defined _ANDROID
+# define OS_ANDROID
 #endif
 
 /* architecture */
@@ -218,7 +220,7 @@ void dym_delete_func_by_name(dym_lib* lib, const char* name){
     func.lib = lib;
     func.name = strdup(name);
     dym_delete_func(&func);
-    FREE(func.name);
+    free(func.name);
 }
 void dym_func_ref(dym_func* func, int c){
     atomic_add(&func->lib->total_func_ref, c);

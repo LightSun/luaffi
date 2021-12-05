@@ -28,11 +28,11 @@ struct hstring;
 typedef struct hffi_value{
     sint8 base_ffi_type;            // see ffi.h
     sint8 pointer_base_type;        // the raw base type. eg: int** -> int
-    sint8 multi_level_ptr;          // true if is multi-level-ptr. that means the data is malloc by function.
+    sint8 should_release_ptr;       // true to release ptr on release
     int volatile ref;               // ref count
     void* ptr;                      // may be data-ptr/struct-ptr/harray-ptr
     ffi_type* ffi_type;             // cache ffi_type
-    struct array_list* sub_types;   // mallocated sub types.
+    struct array_list* sub_types;   // mallocated sub types. need free on release
 }hffi_value;
 
 //struct member type
@@ -113,8 +113,11 @@ hffi_value_get_auto_x_def(int)
 hffi_value_get_auto_x_def(float)
 hffi_value_get_auto_x_def(double)
 
+//base type
 hffi_value* hffi_new_value_raw_type(sint8 type);
+//base type with value ptr.
 hffi_value* hffi_new_value_raw_type2(sint8 type, void* val_ptr);
+//base pointer type
 hffi_value* hffi_new_value_ptr2(sint8 type, void* val_ptr);
 
 /**
@@ -141,6 +144,8 @@ void hffi_delete_value(hffi_value* val);
 void hffi_value_ref(hffi_value* val, int count);
 //1 has data
 int hffi_value_hasData(hffi_value* val);
+//only base type support add operation. return OK for success.
+int hffi_value_add(hffi_value* val, void* ptr);
 
 ffi_type* hffi_value_get_rawtype(hffi_value* val, char** msg);
 
@@ -235,6 +240,7 @@ hffi_struct* hffi_new_struct_base_abi(int abi,sint8* types, int count);
 void hffi_delete_structs(hffi_struct** cs, int count);
 
 int hffi_struct_is_pointer(hffi_struct* hs, int index);
+void* hffi_struct_get_pointer(hffi_struct* hs, int index);
 /**
  * get base value. if base val is simple ptr.you must assign target_hffi.
  * @return HFFI_STATE_OK for success.
@@ -248,7 +254,8 @@ struct harray* hffi_struct_get_as_array(hffi_struct* hs, int index, sint8 hffi_t
 
 int hffi_struct_set_harray(hffi_struct* hs, int index, struct harray* arr);
 int hffi_struct_set_struct(hffi_struct* hs, int index, hffi_struct* hs_val);
-
+//like int ->&int_val
+hffi_value* hffi_struct_to_ptr_value(hffi_struct* hs, int index, int target_ffi_t);
 //----------------- manager -------------------
 
 hffi_manager* hffi_new_manager();

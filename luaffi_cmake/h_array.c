@@ -830,7 +830,9 @@ int harray_set_all(harray* arr, void* ptr){
     case HFFI_TYPE_STRUCT:
     {
         if(arr->data){
-            memcpy(arr->data, ptr, arr->data_size);
+            if(ptr){
+                memcpy(arr->data, ptr, arr->data_size);
+            }
         }else{
             //must ensure the data size match
             arr->data = ptr;

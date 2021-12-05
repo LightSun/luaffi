@@ -95,8 +95,8 @@ target_link_libraries(luaffi_app ffi2 lua)
 if(gTest_enabled)
     target_link_libraries(luaffi_app ${gTest_libs})
 endif()
-#target_compile_definitions(luaffi_app PRIVATE X86_WIN64)
-add_compile_definitions(X86_64)
+#add_compile_definitions(X86_64)
+add_compile_definitions(X86_WIN64)
 
 #--------- add test lib ------
 add_library(test_hffi SHARED libtest.c)
