@@ -12,6 +12,13 @@ local function check_ptr(val, msg)
 	end
 end
 
+local function check_state(v, msg)
+	if not v then
+		print(msg)	
+		os.exit(1)	
+	end
+end
+
 local INBUF_SIZE = 4096
 local filename = ""; -- TODO
 local outfilename = "";
@@ -114,8 +121,22 @@ check_ptr(f, "Could not open "..filename)
 local frame = avcodec.av_frame_alloc({ret = hffi.valuePtr(void)})
 check_ptr(frame, "Could not allocate video frame\n")
 
+
+-- static void decode(AVCodecContext *dec_ctx, AVFrame *frame, AVPacket *pkt, const char *filename)
 local function decode(c, frame, stru_pkt, outfilename)
 	--TODO 
+	local val_ret = avcodec.avcodec_send_packet({ret=int;c, stru_pkt})
+	check_state(val_ret.get() < 0, "Error sending a packet for decoding\n");
+	while(val_ret.get() >= 0) do
+		avcodec.avcodec_receive_frame {ret = val_ret; c, frame}
+		if(val_ret.get() == EAGAIN) then
+			return
+		end
+		if(val_ret.get() == AVERROR_EOF) then
+			return
+		end
+		check_state(val_ret.get() < 0, "Error during decoding\n");
+	end
 end
 
 local val_int = hffi.value(int, 0)
@@ -127,6 +148,7 @@ local pkt_size_ptr = hffi.value(pointer, int, stru_pkt.size)
 -- data = inbuf
 local data = hffi.valuePtr(void)
 local AV_NOPTS_VALUE = hffi.value(sint64, 0x8000000000000000)
+print("AV_NOPTS_VALUE:", AV_NOPTS_VALUE.get())
 local ZERO = hffi.value(int, 0)
 local offset = 0;
 while(true) do

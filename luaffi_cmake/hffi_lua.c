@@ -1,4 +1,5 @@
 
+#include <errno.h>
 #include "hffi_lua.h"
 #include "hffi.h"
 #include "dym_loader.h"
@@ -1549,6 +1550,9 @@ static int xffi_defines(lua_State *L){
 #undef reg_t
     lua_pushinteger(L, __N_VAL);
     lua_setglobal(L, "N");
+
+    lua_pushinteger(L, EAGAIN);
+    lua_setglobal(L, "EAGAIN");
     return 0;
 }
 
@@ -1564,6 +1568,8 @@ static int xffi_undefines(lua_State *L){
 #undef unreg_t
     lua_pushnil(L);
     lua_setglobal(L, "N");
+    lua_pushnil(L);
+    lua_setglobal(L, "EAGAIN");
     return 0;
 }
 static int xffi_typeStr(lua_State *L){

@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 #cmake can build gTest
 SET(gTest_enabled true)
-SET(ENV_HOME true)
+#SET(ENV_HOME true)
 #SET(ext_libffi true)
 
 
