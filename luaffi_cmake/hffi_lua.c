@@ -520,10 +520,12 @@ static int xffi_struct_new(lua_State *L){
     luaL_checktype(L, 1, LUA_TTABLE);
     if(lua_rawlen(L, 1) == 0) return 0;
     //options
-    int no_data = 0;
+    int nodata = 0;
+    int freeData = 1;
     int abi = FFI_DEFAULT_ABI;
-    no_data = hlua_get_boolean(L, 1, "no_data", no_data);
+    nodata = hlua_get_boolean(L, 1, "no_data", nodata);
     abi = hlua_get_int(L, 1, "abi", abi);
+    freeData = hlua_get_boolean(L, 1, "free_data", freeData);
     //start build param
     array_list* sm_list = array_list_new_simple();
     array_list* sm_names = array_list_new_simple();
@@ -541,7 +543,7 @@ static int xffi_struct_new(lua_State *L){
     msg[0] = _m;
     //create struct
     hffi_struct* _struct;
-    if(no_data){
+    if(nodata){
         _struct = hffi_new_struct_from_list_nodata(abi, sm_list, msg);
     }else{
         _struct = hffi_new_struct_from_list2(abi, sm_list, msg);
@@ -551,6 +553,7 @@ static int xffi_struct_new(lua_State *L){
         array_list_delete2(sm_names, string_delete);
         return luaL_error(L, "create struct failed by '%s'", msg[0]);
     }
+    _struct->should_free_data = freeData;
     array_list_delete2(sm_list, list_travel_smtype_delete);
     push_ptr_hffi_struct(L, _struct);
     hlua_push_light_uservalue(L, -1, sm_names, __delete_smnames);
@@ -666,7 +669,7 @@ static int xffi_struct_index(lua_State *L){
         //unknown. reguard as a simple ptr value.
         hffi_value* val = hffi_new_value_ptr_nodata(HFFI_TYPE_VOID);
         val->ptr = hffi_struct_get_pointer(hs, index);
-        val->should_release_ptr = 0;
+        val->should_free_ptr = 0;
         return push_ptr_hffi_value(L, val);
     }break;
 
@@ -1069,13 +1072,13 @@ static int __hiff_value_ptr_value(lua_State *L){
     hffi_value* newVal = hffi_new_value_ptr_nodata(HFFI_TYPE_VOID);
     newVal->ptr = &val->ptr;
     //as this ptr is not alloc by self value.
-    newVal->should_release_ptr = 0;
+    newVal->should_free_ptr = 0;
     return push_ptr_hffi_value(L, newVal);
 }
 static int __hiff_value_setPtr(lua_State *L){
     //array, offset
     hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
-    if(val->ptr && val->should_release_ptr){
+    if(val->ptr && val->should_free_ptr){
         return luaL_error(L, "valid value data can't call 'ptrOffset(...)'.");
     }
     if(val->base_ffi_type != HFFI_TYPE_POINTER){

@@ -28,7 +28,7 @@ struct hstring;
 typedef struct hffi_value{
     sint8 base_ffi_type;            // see ffi.h
     sint8 pointer_base_type;        // the raw base type. eg: int** -> int
-    sint8 should_release_ptr;       // true to release ptr on release
+    sint8 should_free_ptr;          // true to release ptr on release
     int volatile ref;               // ref count
     void* ptr;                      // may be data-ptr/struct-ptr/harray-ptr
     ffi_type* ffi_type;             // cache ffi_type

@@ -174,6 +174,7 @@ typedef struct hffi_struct{
     sint16 parent_pos;  // the parent position if need. or HFFI_STRUCT_NO_PARENT for no parent struct.
                         // HFFI_STRUCT_NO_DATA for malloc data by others.
     sint8 abi;          // which used to create
+    sint8 should_free_data;  //often true(1)
     sint8* hffi_types;  // the member base types, latter used to get value.
     int data_size;
     int count;          // member count

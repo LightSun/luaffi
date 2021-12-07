@@ -279,7 +279,7 @@ hffi_value* hffi_new_value(sint8 hffi_t, sint8 hffi_t2, int size){
     val_ptr->base_ffi_type = hffi_t;
     val_ptr->pointer_base_type = hffi_t2;
     val_ptr->ref = 1;   
-    val_ptr->should_release_ptr = 1;
+    val_ptr->should_free_ptr = 1;
     if(size > 0){
         val_ptr->ptr = MALLOC(size);
         memset(val_ptr->ptr, 0, size);
@@ -295,7 +295,7 @@ hffi_value* hffi_new_value_ptr_nodata(sint8 hffi_t2){
     val_ptr->base_ffi_type = HFFI_TYPE_POINTER;
     val_ptr->pointer_base_type = hffi_t2;
     val_ptr->ref = 1;
-    val_ptr->should_release_ptr = 1;
+    val_ptr->should_free_ptr = 1;
     return val_ptr;
 }
 
@@ -341,7 +341,7 @@ hffi_value* hffi_new_value_raw_type(sint8 ffi_t){
 hffi_value* hffi_new_value_struct(hffi_struct* c){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
-    val_ptr->should_release_ptr = 1;
+    val_ptr->should_free_ptr = 1;
     val_ptr->ptr = c;
     val_ptr->base_ffi_type = HFFI_TYPE_STRUCT;
     val_ptr->pointer_base_type = HFFI_TYPE_VOID;
@@ -352,7 +352,7 @@ hffi_value* hffi_new_value_struct(hffi_struct* c){
 hffi_value* hffi_new_value_struct_ptr(hffi_struct* c){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
-    val_ptr->should_release_ptr = 1;
+    val_ptr->should_free_ptr = 1;
     val_ptr->ptr = c;
     val_ptr->base_ffi_type = HFFI_TYPE_POINTER;
     val_ptr->pointer_base_type = HFFI_TYPE_STRUCT;
@@ -363,7 +363,7 @@ hffi_value* hffi_new_value_struct_ptr(hffi_struct* c){
 hffi_value* hffi_new_value_harray_ptr(harray* c){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
-    val_ptr->should_release_ptr = 1;
+    val_ptr->should_free_ptr = 1;
     val_ptr->ptr = c;
     val_ptr->base_ffi_type = HFFI_TYPE_POINTER;
     val_ptr->pointer_base_type = HFFI_TYPE_HARRAY;
@@ -374,7 +374,7 @@ hffi_value* hffi_new_value_harray_ptr(harray* c){
 hffi_value* hffi_new_value_closure(hffi_closure* c){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
     memset(val_ptr, 0, sizeof (hffi_value));
-    val_ptr->should_release_ptr = 1;
+    val_ptr->should_free_ptr = 1;
     val_ptr->ptr = c;
     val_ptr->base_ffi_type = HFFI_TYPE_POINTER;
     val_ptr->pointer_base_type = HFFI_TYPE_CLOSURE;
@@ -384,7 +384,7 @@ hffi_value* hffi_new_value_closure(hffi_closure* c){
 }
 hffi_value* hffi_new_value_harray(struct harray* arr){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
-    val_ptr->should_release_ptr = 1;
+    val_ptr->should_free_ptr = 1;
     val_ptr->sub_types = array_list_new2(4);
     val_ptr->ffi_type = __harray_to_ffi_type(FFI_DEFAULT_ABI, arr, val_ptr->sub_types);
     val_ptr->ptr = arr;
@@ -403,7 +403,7 @@ hffi_value* hffi_value_copy(hffi_value* val){
     val_ptr->base_ffi_type = val->base_ffi_type;
     val_ptr->pointer_base_type = val->pointer_base_type;
     val_ptr->ref = 1;
-    val_ptr->should_release_ptr = 1;
+    val_ptr->should_free_ptr = 1;
 
 #define hffi_value_copy_IMPL(ffi_t, type)\
 case ffi_t:{\
@@ -433,14 +433,14 @@ case ffi_t:{\
         }else{
             if(!ptr_set && val->ptr != NULL){
                 val_ptr->ptr = val->ptr;
-                val_ptr->should_release_ptr = 0;
+                val_ptr->should_free_ptr = 0;
             }
         }
     }break;
     default:
         if(!ptr_set && val->ptr != NULL){
             val_ptr->ptr = val->ptr;
-            val_ptr->should_release_ptr = 0;
+            val_ptr->should_free_ptr = 0;
         }
     }
     return val_ptr;
@@ -473,7 +473,7 @@ void hffi_delete_value(hffi_value* val){
             }else if(val->pointer_base_type == HFFI_TYPE_CLOSURE){
                 hffi_delete_closure((hffi_closure*)val->ptr);
             }else{
-                if(val->ptr !=NULL && val->should_release_ptr){
+                if(val->ptr !=NULL && val->should_free_ptr){
                     FREE(val->ptr);
                 }
             }
@@ -482,7 +482,7 @@ void hffi_delete_value(hffi_value* val){
         default:
             // for 'base_ffi_type' = pointer, 'pointer_base_type' = void.
             // that means the ptr is alloc by others. here will not free it.
-            if(val->ptr !=NULL && val->should_release_ptr){
+            if(val->ptr !=NULL && val->should_free_ptr){
                 FREE(val->ptr);
             }
         }
@@ -1259,6 +1259,7 @@ static inline hffi_struct* hffi_new_struct_from_list0(int abi,struct array_list*
     ptr->parent_pos = parent_pos;
     ptr->sub_ffi_types = sub_types;
     ptr->abi = (sint8)abi;
+    ptr->should_free_data = 1;
     //handle sub structs' data-pointer.
     __struct_set_children_data(ptr);
     return ptr;
@@ -1382,6 +1383,7 @@ hffi_struct* hffi_struct_copy(hffi_struct* _hs){
     ptr->abi = _hs->abi;
     ptr->parent_pos = _hs->parent_pos;
     ptr->sub_ffi_types = sub_types;
+    ptr->should_free_data = 1;
     //only need data when is parent struct.
     if(_hs->data && _hs->parent_pos < 0){
         ptr->data = MALLOC(_hs->data_size);
@@ -1504,7 +1506,7 @@ void hffi_delete_struct(hffi_struct* val){
             array_list_delete2(val->children, __release_struct_item);
         }
         // MALLOC data by self
-        if(val->parent_pos < 0 && val->data){
+        if(val->parent_pos < 0 && val->data && val->should_free_data){
             FREE(val->data);
         }
         FREE(val->hffi_types);
@@ -1538,7 +1540,7 @@ hffi_value* hffi_struct_to_ptr_value(hffi_struct* hs, int index, int target_ffi_
     void* data_ptr = hs->data + offsets[index];
     hffi_value* val = hffi_new_value_ptr_nodata(target_ffi_t);
     val->ptr = &data_ptr;
-    val->should_release_ptr = 0;
+    val->should_free_ptr = 0;
     return val;
 }
 

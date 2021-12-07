@@ -36,9 +36,6 @@ int hlua_get_boolean(lua_State* L, int idx, const char* key, int def_val);
 
 int hlua_rawgeti_int(lua_State* L, int tab_idx, int n);
 
-//get ext info from a table: continue_mem, share_mem, rows, cols
-int hlua_get_ext_info(lua_State* L, int tab_idx, int* infos);
-
 int hlua_get_ref(lua_State* L, int tab_id, const char* key, int t);
 
 void hlua_push_light_uservalue(lua_State* L, int tab_idx, void* ud, Fun_delete delete);

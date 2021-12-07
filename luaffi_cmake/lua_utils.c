@@ -74,27 +74,6 @@ int hlua_rawgeti_int(lua_State* L, int tab_idx, int n){
     return v;
 }
 
-//infos[4]: continue_mem, share_mem, rows, cols
-int hlua_get_ext_info(lua_State* L, int tab_idx, int* infos){
-    int continue_mem = 1;
-    int share_mem = 1;
-    infos[0] = hlua_get_boolean(L, tab_idx, "continue_mem", continue_mem);
-    infos[1] = hlua_get_boolean(L, tab_idx, "share_mem", share_mem);
-    //infos[1] = hlua_get_boolean(L, tab_idx, "hffi_t", share_mem);
-
-    if(lua_rawlen(L, tab_idx) == 0) {
-        return -1;
-    }
-    int rows = hlua_rawgeti_int(L, tab_idx, 1);
-    int cols = 0;
-    if(lua_rawlen(L, 1) >= 2){
-        cols = hlua_rawgeti_int(L, tab_idx, 2);
-    }
-    infos[2] = rows;
-    infos[3] = cols;
-    return 0;
-}
-
 void hlua_push_light_uservalue(lua_State* L, int tab_idx, void* ud, Fun_delete delete){
     tab_idx = HLUA_ADJUST_ID(tab_idx);
     struct HDataWrapper* w = MALLOC(sizeof (struct HDataWrapper));
