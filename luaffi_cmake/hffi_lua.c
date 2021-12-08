@@ -73,6 +73,14 @@ static const BasePair _BASE_PAIRS[] = {
     //
     {"uint", HFFI_TYPE_UINT32},
     {"size_t", HFFI_TYPE_UINT32},
+    {"int64_t", HFFI_TYPE_SINT64},
+    {"int32_t", HFFI_TYPE_SINT32},
+    {"int16_t", HFFI_TYPE_SINT16},
+    {"int8_t", HFFI_TYPE_SINT8},
+    {"uint64_t", HFFI_TYPE_UINT64},
+    {"uint32_t", HFFI_TYPE_UINT32},
+    {"uint16_t", HFFI_TYPE_UINT16},
+    {"uint8_t", HFFI_TYPE_UINT8},
     //----- internal types -------
     {"array", HFFI_TYPE_HARRAY},
     {"array_ptr", HFFI_TYPE_HARRAY_PTR},
@@ -1276,7 +1284,13 @@ static int xffi_dym_lib_new(lua_State *L){
 static inline hffi_value* __get_value(lua_State *L, int idx){
     if(lua_type(L, idx) == LUA_TNUMBER){
         return hffi_new_value_raw_type((sint8)luaL_checkinteger(L, idx));
-    }else if(luaL_testudata(L, idx, __STR(hffi_struct)) != 0){
+    }else if(lua_type(L, idx) == LUA_TSTRING){
+        const char* str = lua_tostring(L, idx);
+        harray* arr = harray_new_chars(str);
+        harray_ref(arr, -1);
+        return hffi_new_value_harray_ptr(arr);
+    }
+    else if(luaL_testudata(L, idx, __STR(hffi_struct)) != 0){
         hffi_struct* _struct = get_ptr_hffi_struct(L, idx);
         return hffi_new_value_struct(_struct);
         //how to support struct pointer? recommend use value.
@@ -1556,6 +1570,18 @@ static int xffi_defines(lua_State *L){
 
     lua_pushinteger(L, EAGAIN);
     lua_setglobal(L, "EAGAIN");
+
+    hffi_value* val;
+#define __PUSH_STD_ptr(name, std)\
+    val = hffi_new_value_ptr_nodata(HFFI_TYPE_VOID);\
+    val->ptr = std;\
+    val->should_free_ptr = 0;\
+    push_ptr_hffi_value(L, val);\
+    lua_setglobal(L, name);
+
+    __PUSH_STD_ptr("stdin",stdin)
+    __PUSH_STD_ptr("stdout", stdout)
+    __PUSH_STD_ptr("stderr", stderr)
     return 0;
 }
 
@@ -1573,6 +1599,13 @@ static int xffi_undefines(lua_State *L){
     lua_setglobal(L, "N");
     lua_pushnil(L);
     lua_setglobal(L, "EAGAIN");
+
+    lua_pushnil(L);
+    lua_setglobal(L, "stdin");
+    lua_pushnil(L);
+    lua_setglobal(L, "stdout");
+    lua_pushnil(L);
+    lua_setglobal(L, "stderr");
     return 0;
 }
 static int xffi_typeStr(lua_State *L){
