@@ -343,7 +343,11 @@ int harray_geti(harray* arr, int index, union harray_ele* ptr){
         return HFFI_STATE_FAILED;
     }
     DEF_HFFI_BASE_SWITCH(__GET_I, arr->hffi_t)
-    switch (arr->hffi_t) {       
+    switch (arr->hffi_t) {
+        case HFFI_TYPE_POINTER:{
+             ptr->_extra = ((void**)arr->data)[index];
+             return HFFI_STATE_OK;
+        }break;
         case HFFI_TYPE_STRUCT_PTR:
         case HFFI_TYPE_HARRAY_PTR:{
             if(arr->ele_list == NULL){
@@ -388,8 +392,7 @@ int harray_geti(harray* arr, int index, union harray_ele* ptr){
 #define __SET_I(hffi_t, t)\
 case hffi_t:{\
     ((t*)arr->data)[index] = ptr->_##t;\
-    if(hffi_t == HFFI_TYPE_SINT16) \
-    printf("__SET_I:  index = %d, val = %d\n", index, ((t*)arr->data)[index]);\
+    /*if(hffi_t == HFFI_TYPE_SINT16) printf("__SET_I:  index = %d, val = %d\n", index, ((t*)arr->data)[index]); */\
 }return HFFI_STATE_OK;
 
 #define __SET_I_2(hffi_t, t)\

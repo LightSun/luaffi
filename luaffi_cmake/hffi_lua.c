@@ -1619,6 +1619,17 @@ static int xffi_typeStr(lua_State *L){
     }
     return 0;
 }
+static int xffi_call(lua_State *L){
+    //tab, name, params.
+    int pCount = lua_gettop(L) - 2;
+    const char* fun = luaL_checkstring(L, 2);
+    lua_getfield(L, 1, fun);
+    lua_insert(L, 3);
+    lua_call(L, pCount, 1);
+    lua_pushvalue(L, -1);
+    return 1;
+}
+
 //----------------------------------------
 static inline void setfield_function(lua_State* L,
                               const char key[], lua_CFunction value) {
@@ -1641,6 +1652,7 @@ LUAMOD_API void register_ffi(lua_State *L){
     setfield_function(L, "defines", xffi_defines);
     setfield_function(L, "undefines", xffi_undefines);
     setfield_function(L, "typestr", xffi_typeStr);
+    setfield_function(L, "call", xffi_call);
 
     setfield_function(L, "loadLib", xffi_dym_lib_new);
     setfield_function(L, "value", xffi_value_new);

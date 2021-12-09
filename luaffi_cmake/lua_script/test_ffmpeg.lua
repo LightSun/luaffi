@@ -345,6 +345,10 @@ local frame = avcodec.av_frame_alloc({ret = hffi.valuePtr(void)})
 check_ptr(frame, "Could not allocate video frame\n")
 
 
+local function pgm_save(buf, wrap,  xsize, ysize, filename)
+					 
+end
+
 -- static void decode(AVCodecContext *dec_ctx, AVFrame *frame, AVPacket *pkt, const char *filename)
 local function decode(c, stru_context, frame, stru_pkt, outfilename)
 	--TODO 
@@ -358,7 +362,8 @@ local function decode(c, stru_context, frame, stru_pkt, outfilename)
 		if(val_ret.get() == EAGAIN) then
 			return
 		end
-		if(val_ret.get() == AVERROR_EOF) then
+		-- TODO latter handle EOF. (  FFERRTAG( 'E','O','F',' ') )
+		if(val_ret.get() == AVERROR_EOF) then 
 			return
 		end
 		check_state(val_ret.get() < 0, "Error during decoding\n");
