@@ -1582,6 +1582,7 @@ static int xffi_defines(lua_State *L){
     __PUSH_STD_ptr("stdin",stdin)
     __PUSH_STD_ptr("stdout", stdout)
     __PUSH_STD_ptr("stderr", stderr)
+#undef __PUSH_STD_ptr
     return 0;
 }
 
@@ -1623,7 +1624,9 @@ static int xffi_call(lua_State *L){
     //tab, name, params.
     int pCount = lua_gettop(L) - 2;
     const char* fun = luaL_checkstring(L, 2);
-    lua_getfield(L, 1, fun);
+    if(lua_getfield(L, 1, fun) != LUA_TFUNCTION){
+        return luaL_error(L, "call failed by the second parameter is not function.");
+    }
     lua_insert(L, 3);
     lua_call(L, pCount, 1);
     lua_pushvalue(L, -1);

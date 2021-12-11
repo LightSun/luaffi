@@ -11,7 +11,8 @@
 harray* arr = x;\
 if(arr == NULL) return NULL;\
 arr->data = MALLOC(arr->data_size);\
-memset(arr->data, 0, arr->data_size);
+memset(arr->data, 0, arr->data_size);\
+arr->free_data = 1;
 
 static inline void __harray_detach_child_array(harray* arr, int index){
     harray* sub_arr = arr->ele_list[index];
@@ -230,6 +231,7 @@ harray* harray_copy(harray* src){
     arr->hffi_t = src->hffi_t;
     if(src->data){
         arr->data = MALLOC(src->data_size);
+        arr->free_data = 1;
     }else{
         arr->data = NULL;
     }
@@ -410,7 +412,15 @@ int harray_seti(harray* arr, int index, union harray_ele* ptr){
     }
     DEF_HFFI_BASE_SWITCH(__SET_I, arr->hffi_t)
 
-    switch (arr->hffi_t) {   
+    switch (arr->hffi_t) {
+
+    case HFFI_TYPE_POINTER:{
+        if(!arr->data){
+            arr->data = MALLOC(sizeof (void*) * arr->ele_count);
+            arr->free_data = 1;
+        }
+        ((void**)arr->data)[index] = ptr->_extra;
+    } return HFFI_STATE_OK;
 
     case HFFI_TYPE_HARRAY_PTR:{
         __harray_detach_child_array(arr, index);
@@ -487,7 +497,15 @@ int harray_seti2(harray* arr, int index, void* ptr){
         return HFFI_STATE_FAILED;
     }
     DEF_HFFI_BASE_SWITCH(__SET_I_2, arr->hffi_t)
-    switch (arr->hffi_t) {    
+    switch (arr->hffi_t) {
+    case HFFI_TYPE_POINTER:{
+        if(!arr->data){
+            arr->data = MALLOC(sizeof (void*) * arr->ele_count);
+            arr->free_data = 1;
+        }
+        ((void**)arr->data)[index] = ptr;
+    } return HFFI_STATE_OK;
+
     case HFFI_TYPE_HARRAY_PTR:{
         __harray_detach_child_array(arr, index);
         if(ptr == NULL){
@@ -722,6 +740,9 @@ case ffi_t: hstring_append(hs, type); break;
 
     DEF_HFFI_SWITCH_BASE_FORMAT(harray_dump_impl, arr->hffi_t)
     switch (arr->hffi_t) {
+        case HFFI_TYPE_POINTER:{
+            hstring_append(hs, "\npointer ");
+        }break;
         case HFFI_TYPE_HARRAY:{
             hstring_append(hs, "\n<array> ");
             union harray_ele ele;
@@ -831,6 +852,7 @@ int harray_set_all(harray* arr, void* ptr){
     case HFFI_TYPE_INT:
     case HFFI_TYPE_HARRAY:
     case HFFI_TYPE_STRUCT:
+    case HFFI_TYPE_POINTER:
     {
         if(arr->data){
             if(ptr){
@@ -846,6 +868,7 @@ int harray_set_all(harray* arr, void* ptr){
     case HFFI_TYPE_HARRAY_PTR:{
         if(!arr->data){
             arr->data = MALLOC(sizeof (void*) * arr->ele_count);
+            arr->free_data = 1;
         }
         void** data = arr->data;
         for(int i = 0 ; i< arr->ele_count ; i ++){
@@ -864,6 +887,7 @@ int harray_set_all(harray* arr, void* ptr){
     case HFFI_TYPE_STRUCT_PTR:{
         if(!arr->data){
             arr->data = MALLOC(sizeof (void*) * arr->ele_count);
+            arr->free_data = 1;
         }
         void** data = arr->data;
         for(int i = 0 ; i< arr->ele_count ; i ++){
@@ -877,6 +901,7 @@ int harray_set_all(harray* arr, void* ptr){
         }
         return HFFI_STATE_OK;
     }break;
+
     }
     return HFFI_STATE_FAILED;
 }
