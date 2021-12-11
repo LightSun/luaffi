@@ -141,7 +141,7 @@ dym_lib* dym_new_lib2(const char* dir,const char* libname){
 static void __func_release(void* ud, void* data){
     (void)ud;
     dym_func* func = data;
-    FREE(func->name);
+    free(func->name);
     FREE(func);
 }
 static inline void __dym_delete_lib(dym_lib* lib, int checkFunc){

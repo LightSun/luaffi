@@ -176,6 +176,15 @@ static inline int __harray_set_vals(lua_State* L, harray* arr, int index){
     _harray_newindex_impl_f(HFFI_TYPE_FLOAT, float)
     _harray_newindex_impl_f(HFFI_TYPE_DOUBLE, double)
 
+    case HFFI_TYPE_POINTER:{
+        hffi_value* val = get_ptr_hffi_value(L, -1);
+        union harray_ele ele;
+        ele._extra = val->ptr;
+        if(harray_seti(arr, index, &ele) == HFFI_STATE_OK){
+           return 0;
+        }
+    }break;
+
     case HFFI_TYPE_HARRAY:
     case HFFI_TYPE_HARRAY_PTR:{
         union harray_ele ele;
@@ -272,6 +281,17 @@ static int __harray_func_hasData(lua_State* L){
     lua_pushboolean(L, arr->data != NULL);
     return 1;
 }
+static int __harray_func_offsetPtrValue(lua_State* L){
+    harray* arr = get_ptr_harray(L, lua_upvalueindex(1));
+    int offset = luaL_checkinteger(L, 1);
+    if(offset >= arr->data_size){
+        return luaL_error(L, "out of range");
+    }
+    hffi_value* val = hffi_new_value_ptr_nodata(HFFI_TYPE_VOID);
+    val->ptr = arr->data + offset;
+    val->should_free_ptr = 0;
+    return push_ptr_hffi_value(L, val);
+}
 
 static const luaL_Reg g_harray_str_Methods[] = {
     {"set", __harray_func_set},
@@ -280,6 +300,7 @@ static const luaL_Reg g_harray_str_Methods[] = {
     {"copy", __harray_func_copy},
     {"eletype", __harray_func_eletype},
     {"elesize", __harray_func_elesize},
+    {"offsetPtrValue", __harray_func_offsetPtrValue},
     {NULL, NULL}
 };
 static int xffi_harray_index(lua_State* L){
@@ -315,12 +336,22 @@ static int xffi_harray_index(lua_State* L){
 
      _harray_index_impl_f(HFFI_TYPE_FLOAT, float)
      _harray_index_impl_f(HFFI_TYPE_DOUBLE, double)
+     case HFFI_TYPE_POINTER:{
+         union harray_ele ele;
+         if(harray_geti(arr, index, &ele) == HFFI_STATE_OK){
+             hffi_value* val = hffi_new_value_ptr_nodata(HFFI_TYPE_VOID);
+             val->ptr = ele._extra;
+             val->should_free_ptr = 0;
+             return push_ptr_hffi_value(L, val);
+         }
+         return 0;
+     }break;
 
      case HFFI_TYPE_HARRAY:
      case HFFI_TYPE_HARRAY_PTR:{
          union harray_ele ele;
          if(harray_geti(arr, index, &ele) == HFFI_STATE_OK){
-             harray_ref((harray*)ele._extra, 1);
+            harray_ref((harray*)ele._extra, 1);
             return push_ptr_harray(L, (harray*)ele._extra);
          }
          return 0;
@@ -829,12 +860,14 @@ static int xffi_value_ptr_new(lua_State *L){
     hffi_value* val;
     switch (lua_type(L, 1)) {
     case LUA_TNUMBER:{
+        //
         sint8 type = luaL_checkinteger(L, 1);
-        int nodata = 1;
+        int free_ptr = 0;
         if(lua_gettop(L) >= 2){
-            nodata = lua_toboolean(L, 2);
+            free_ptr = lua_toboolean(L, 2);
         }
-        val = nodata ? hffi_new_value_ptr_nodata(type) : hffi_new_value_ptr(type);
+        val = hffi_new_value_ptr_nodata(type);
+        val->should_free_ptr = free_ptr;
     }break;
 
     case LUA_TSTRING:{
@@ -1031,11 +1064,12 @@ static int __hiff_value_add(lua_State *L){
     if(!hffi_is_base_type(val->base_ffi_type)){
         return luaL_error(L, "unsupport value type for add(...)");
     }
+    //printf("lua_type(L, 1): %d\n", lua_type(L, 1));
     if(lua_type(L, 1)== LUA_TNUMBER){
 #define __XFFI_VALUE_ADD_NUMBER(ffi_t, type)\
 case ffi_t:{\
     type num = (type)lua_tointeger(L, 1);\
-    if(hffi_value_add(val, &num)){\
+    if(hffi_value_add(val, &num) == HFFI_STATE_OK){\
         hffi_value_ref(val, 1);\
         return push_ptr_hffi_value(L, val);\
     }\
@@ -1043,13 +1077,13 @@ case ffi_t:{\
     DEF_HFFI_BASE_SWITCH_INT(__XFFI_VALUE_ADD_NUMBER, val->base_ffi_type)
     if(val->base_ffi_type == HFFI_TYPE_FLOAT){
         float num = (float)lua_tonumber(L, 1);
-        if(hffi_value_add(val, &num)){
+        if(hffi_value_add(val, &num) == HFFI_STATE_OK){
             hffi_value_ref(val, 1);
             return push_ptr_hffi_value(L, val);
         }
     }else if(val->base_ffi_type == HFFI_TYPE_DOUBLE){
         double num = (double)lua_tonumber(L, 1);
-        if(hffi_value_add(val, &num)){
+        if(hffi_value_add(val, &num) == HFFI_STATE_OK){
             hffi_value_ref(val, 1);
             return push_ptr_hffi_value(L, val);
         }
@@ -1061,14 +1095,58 @@ case ffi_t:{\
         }
 #define __XFFI_VALUE_ADD_VALUE(ffi_t, type)\
 case ffi_t:{\
-    if(hffi_value_add(val, val2->ptr)){\
+    if(hffi_value_add(val, val2->ptr) == HFFI_STATE_OK){\
         hffi_value_ref(val, 1);\
         return push_ptr_hffi_value(L, val);\
     }\
 }break;
        DEF_HFFI_BASE_SWITCH(__XFFI_VALUE_ADD_VALUE, val->base_ffi_type)
     }
-    return luaL_error(L, "value add op only support number with base value type.");
+    return luaL_error(L, "value add op only support number or it's value.");
+}
+static int __hiff_value_set(lua_State *L){
+    hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
+    if(!hffi_is_base_type(val->base_ffi_type)){
+        return luaL_error(L, "unsupport value type for add(...)");
+    }
+    if(lua_type(L, 1)== LUA_TNUMBER){
+#define __XFFI_VALUE_SET_NUMBER(ffi_t, type)\
+case ffi_t:{\
+    type num = (type)lua_tointeger(L, 1);\
+    if(hffi_value_set_base(val, &num) != HFFI_STATE_OK){\
+        return luaL_error(L, "value.set(...) failed(int-like).");\
+    }\
+    return 0;\
+}break;
+    DEF_HFFI_BASE_SWITCH_INT(__XFFI_VALUE_SET_NUMBER, val->base_ffi_type)
+    if(val->base_ffi_type == HFFI_TYPE_FLOAT){
+        float num = (float)lua_tonumber(L, 1);
+        if(hffi_value_set_base(val, &num) != HFFI_STATE_OK){
+            return luaL_error(L, "value.set(...) failed(float).");
+        }
+        return 0;
+    }else if(val->base_ffi_type == HFFI_TYPE_DOUBLE){
+        double num = (double)lua_tonumber(L, 1);
+        if(hffi_value_set_base(val, &num) != HFFI_STATE_OK){
+            return luaL_error(L, "value.set(...) failed(float).");
+        }
+        return 0;
+    }
+    }else if(luaL_testudata(L, 1, __STR(hffi_value))){
+        hffi_value* val2 = get_ptr_hffi_value(L, 1);
+        if(!hffi_is_base_type(val2->base_ffi_type)){
+            return luaL_error(L, "unsupport value type for value.set(...)");
+        }
+#define __XFFI_VALUE_SET_VALUE(ffi_t, type)\
+case ffi_t:{\
+    if(hffi_value_set_base(val, val2->ptr) != HFFI_STATE_OK){\
+        return luaL_error(L, "value.set(...) failed(value like).");\
+    }\
+    return 0;\
+}break;
+       DEF_HFFI_BASE_SWITCH(__XFFI_VALUE_SET_VALUE, val->base_ffi_type)
+    }
+    return luaL_error(L, "value set op only support number or it's value.");
 }
 static int __hiff_value_ptr_null(lua_State *L){
     hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
@@ -1107,6 +1185,7 @@ static int xffi_value_index(lua_State *L){
         __INDEX_METHOD("hasData", __hiff_value_hasData);
         __INDEX_METHOD("as", __hiff_value_as);
         __INDEX_METHOD("add", __hiff_value_add);
+        __INDEX_METHOD("set", __hiff_value_set);
          //make ptr to null. this is used when ptr is released by extra function call(dym_lib).
         __INDEX_METHOD("ptrToNull", __hiff_value_ptr_null);
         //the pointer to current value.
@@ -1282,30 +1361,38 @@ static int xffi_dym_lib_new(lua_State *L){
 }
 //---------------------  -------------------
 static inline hffi_value* __get_value(lua_State *L, int idx){
-    if(lua_type(L, idx) == LUA_TNUMBER){
+    switch (lua_type(L, idx)) {
+    case LUA_TNIL:{
+        return hffi_new_value_ptr_nodata(HFFI_TYPE_VOID);
+    }break;
+
+    case LUA_TNUMBER:{
         return hffi_new_value_raw_type((sint8)luaL_checkinteger(L, idx));
-    }else if(lua_type(L, idx) == LUA_TSTRING){
+    }break;
+
+    case LUA_TSTRING:{
         const char* str = lua_tostring(L, idx);
         harray* arr = harray_new_chars(str);
         harray_ref(arr, -1);
         return hffi_new_value_harray_ptr(arr);
+    }break;
+    case LUA_TUSERDATA:{
+        if(luaL_testudata(L, idx, __STR(hffi_struct)) != 0){
+            hffi_struct* _struct = get_ptr_hffi_struct(L, idx);
+            return hffi_new_value_struct(_struct);
+            //how to support struct pointer? recommend use value.
+        }else if(luaL_testudata(L, idx, __STR(hffi_value)) != 0){
+            hffi_value* val = get_ptr_hffi_value(L, idx);
+            hffi_value_ref(val, 1);
+            return val;
+        }else if(luaL_testudata(L, idx, __STR(harray)) != 0){
+            harray* val = get_ptr_harray(L, idx);
+            //for support harray ptr. must create hffi_value
+            return hffi_new_value_harray(val);
+        }
+    }break;
     }
-    else if(luaL_testudata(L, idx, __STR(hffi_struct)) != 0){
-        hffi_struct* _struct = get_ptr_hffi_struct(L, idx);
-        return hffi_new_value_struct(_struct);
-        //how to support struct pointer? recommend use value.
-    }else if(luaL_testudata(L, idx, __STR(hffi_value)) != 0){
-        hffi_value* val = get_ptr_hffi_value(L, idx);
-        hffi_value_ref(val, 1);
-        return val;
-    }else if(luaL_testudata(L, idx, __STR(harray)) != 0){
-        harray* val = get_ptr_harray(L, idx);
-        //for support harray ptr. must create hffi_value
-        return hffi_new_value_harray(val);
-    }
-    else{
-        return NULL;
-    }
+    return NULL;
 }
 //------------------- closure ----------------------
 #define HLUA_EXT_LEN 4

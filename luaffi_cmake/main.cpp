@@ -54,6 +54,7 @@ LUALIB_API void luaL_openlibs2(lua_State *L, const luaL_Reg funcs[]) {
 #define LUA_DIR "../luaffi_cmake/lua_script"
 
 static void test_ffi_all(){
+    //printf("EOF = %lld \n", 'E' | ('O' << 8) | ('F' << 16) | ' ' << 24);
     libffi_test_closure_struct();
     test_harray();
     testCall();

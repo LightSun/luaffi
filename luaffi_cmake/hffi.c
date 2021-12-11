@@ -522,6 +522,7 @@ case ffi_t:{\
     DEF_HFFI_BASE_SWITCH(DEF_hffi_value_add_IMPL, val->base_ffi_type)
     return HFFI_STATE_FAILED;
 }
+
 hffi_smtype* hffi_value_to_smtype(hffi_value* val){
 #define DEF_VALUE_TO_SMTYPE_BASE_IMPL(ffi_t, type)\
 case ffi_t:{\

@@ -1,5 +1,8 @@
 -- for gcc/vc c-enum is 4 size.
 -- : https://github.com/FFmpeg/FFmpeg/blob/release%2F4.4/doc/examples/decode_video.c
+-- ffmpeg -i foreman.mp4 -c:v mpeg2video -q:v 5 -c:a mp2 -f vob video.mpg
+local ints = require("ints")
+local AVERROR_EOF = -ints.shift_bor2("EOF ")
 print("-------- start test_ffmpeg---------");
 AV_INPUT_BUFFER_PADDING_SIZE = 64
 -- enum 
@@ -20,343 +23,116 @@ local function check_state(v, msg)
 end
 
 local INBUF_SIZE = 4096
-local filename = ""; -- TODO
-local outfilename = "";
+-- ./decode_video ~/Videos/MyVideo.mpeg ~/Videos/frame
+local filename = "foreman.mpeg"; -- TODO '.mpeg'
+local outfilename = "foreman";
 
 hffi.defines();
+local ffmpeg_structs = require("ffmpeg_structs")
 
 local lib_Dir ="D:/study/tools/ffmpeg/gcc-win64-lgpl-shared-4.4/bin/"
 local avcodec_path = "avcodec-58";
+local avutil_path = "avutil-56";
 
 -- pkt = av_packet_alloc();
 -- need AVPacket, AVBufferRef, AVBuffer. AVPacketSideData
-local stru_pkt = hffi.struct{
-	"no_data" = true;
-	"free_data" = false;
-	pointer, "buf"; -- AVBufferRef*
-	sint64, "pts";
-	sint64, "dts";
-	pointer, "data"; -- uint8_t*
-	int, "size";
-	int, "stream_index";
-	int, "flags";
-	pointer, "side_data"; -- AVPacketSideData*
-	int, "side_data_elems";
-	
-	sint64, "duration";
-	sint64, "pos";
-	sint64, "convergence_duration";
-}
+local stru_pkt = ffmpeg_structs.avpacket
 -- 1， uint8_t inbuf[INBUF_SIZE + AV_INPUT_BUFFER_PADDING_SIZE];
+--     memset(inbuf + INBUF_SIZE, 0, AV_INPUT_BUFFER_PADDING_SIZE); hffi default all is zero in array.
 local inbuf = hffi.array(uint8, INBUF_SIZE + AV_INPUT_BUFFER_PADDING_SIZE) -- default zero
 
 
 local avcodec = hffi.loadLib(lib_Dir, avcodec_path)
+local avutil = hffi.loadLib(lib_Dir, avutil_path)
+
+avcodec.avcodec_register_all{}
 
 -- 2， pkt = av_packet_alloc();
-local pkt = avcodec.av_packet_alloc {ret = hffi.valuePtr(void)}
+print("--- 2, start call 'avcodec.av_packet_alloc(...)' ---")
+local tmp_val = hffi.valuePtr(void);
+assert(tmp_val.hasData() == false)
+local pkt = avcodec.av_packet_alloc {ret = tmp_val}
+check_ptr(pkt, "pkt allocate failed\n")
 print("pkt.addr():", pkt.addr())
 pkt.as(stru_pkt)
 
 -- /* find the MPEG-1 video decoder */
--- codec = avcodec_find_decoder(AV_CODEC_ID_MPEG1VIDEO);
-local stru_codec = hffi.struct{
-	"no_data" = true;
-	"free_data" = false;
-	pointer, "name";  -- const char*
-	pointer, "long_name";
-	int, "type"; --  enum AVMediaType
-	int, "id"; --    enum AVCodecID
-	int, "capabilities";
-	pointer, "supported_framerates";  -- AVRational *
-	pointer, "pix_fmts";  			  -- AVPixelFormat *
-	pointer, "supported_samplerates"; -- int*
-	pointer, "sample_fmts";			  -- AVSampleFormat *	
-	pointer, "channel_layouts";		  -- uint64_t*
-	uint8, "max_lowres";			  
-	pointer, "priv_class";		 -- AVClass *
-	pointer, "profiles";	     -- AVProfile*
-	pointer, "wrapper_name";     -- const char*	
-	pointer, "priv_data_size";	 -- int
-	pointer, "next";			 -- AVCodec* 
-	pointer, "update_thread_context";	-- closure
-	pointer, "defaults";	 -- AVCodecDefault*
-	
-	pointer, "init_static_data";  -- closure ...	
-	pointer, "init";	
-	pointer, "encode_sub";	
-	pointer, "encode2";	
-	pointer, "decode";	
-	pointer, "close";	
-	pointer, "receive_packet";	
-	pointer, "receive_frame";	
-	pointer, "flush";	
-	
-	int, "caps_internal";	
-	pointer, "bsfs";	-- const char* 
-	pointer, "hw_configs";	-- AVCodecHWConfigInternal**
-	pointer, "codec_tags";	-- uint32_t*	
-}
+-- 3, codec = avcodec_find_decoder(AV_CODEC_ID_MPEG1VIDEO);
+local stru_codec = ffmpeg_structs.avcodec;
 
+print("--- 3, start call 'avcodec.avcodec_find_decoder(...)' ---")
 local codec = avcodec.avcodec_find_decoder{ret = hffi.valuePtr(void), hffi.value(int, AV_CODEC_ID_MPEG1VIDEO)}
 check_ptr(codec, "Codec not found\n")
 
 codec.as(stru_codec)
 
--- parser = av_parser_init(codec->id);
+-- 4, parser = av_parser_init(codec->id);
+print("--- 4, start call 'avcodec.av_parser_init(...)' ---")
 local parser = avcodec.av_parser_init{ret = hffi.valuePtr(void), hffi.value(int, stru_codec.id)}
 check_ptr(parser, "Parser not found\n")
 
--- c = avcodec_alloc_context3(codec);
+-- 5, c = avcodec_alloc_context3(codec);
+print("--- 5, start call 'avcodec.avcodec_alloc_context3(...)' ---")
 local c = avcodec.avcodec_alloc_context3 {ret = hffi.valuePtr(void), hffi.valuePtr(stru_codec)}
 check_ptr(parser, "Could not allocate video codec context\n")
 
-local stru_AVRational = hffi.struct{
-	int "num"; --///< Numerator
-    int "den"; --///< Denominator
-}
-
--- uint64_t error[AV_NUM_DATA_POINTERS];
-local arr_error = hffi.array(uint64_t, 8);
-
 -- struct AVCodecContext
-local stru_context = hffi.struct{
-	"no_data" = true;
-	"free_data" = false;
-	pointer, "av_class"; -- AVClass*	
-	int, "log_level_offset";
-	int, "codec_type";	 -- enum AVMediaType
-	pointer, "codec";
-	int, "codec_id";	 -- enum AVCodecID
-	uint, "codec_tag";
-	pointer, "priv_data";
-	pointer, "internal";
-	pointer, "opaque";
-	sint64, "bit_rate";
-	int, "bit_rate_tolerance";
-	int, "global_quality";
-	int, "compression_level";
-	int, "flags";
-	int, "flags2";
-	pointer, "extradata";
-	int, "extradata_size";
-	stru_AVRational, "time_base";
-	int, "ticks_per_frame";
-	int, "delay";
-	int, "width";
-	int, "height";
-	int, "coded_width";
-	int, "coded_height";
-	int, "gop_size";
-	int, "pix_fmt"; -- AVPixelFormat
-	pointer, "draw_horiz_band";
-	pointer, "get_format";
-	int, "max_b_frames";
-	float, "b_quant_factor";
-	int, "b_frame_strategy";
-	float, "b_quant_offset";
-	int, "has_b_frames";
-	int, "mpeg_quant";
-	float, "i_quant_factor";
-	float, "i_quant_offset";
-	float, "lumi_masking";
-	float, "temporal_cplx_masking";
-	float, "spatial_cplx_masking";
-	float, "p_masking";
-	float, "dark_masking";
-	int, "slice_count";
-	int, "prediction_method";
-	pointer, "slice_offset";
-	stru_AVRational.copy(), "sample_aspect_ratio";
-	int, "me_cmp";
-	int, "me_sub_cmp";
-	int, "mb_cmp";
-	int, "ildct_cmp";
-	int, "dia_size";
-	int, "last_predictor_count";
-	int, "pre_me";
-	int, "me_pre_cmp";
-	int, "pre_dia_size";
-	int, "me_subpel_quality";
-	int, "me_range";
-	int, "slice_flags";
-	int, "mb_decision";
-	pointer, "intra_matrix";
-	pointer, "inter_matrix";
-	int, "scenechange_threshold";
-	int, "noise_reduction";
-	int, "intra_dc_precision";
-	int, "skip_top";
-	int, "skip_bottom";
-	int, "mb_lmin";
-	int, "mb_lmax";
-	int, "me_penalty_compensation";
-	int, "bidir_refine";
-	int, "brd_scale";
-	int, "keyint_min";
-	int, "refs";
-	int, "mv0_threshold";
-	int, "b_sensitivity";
-	int, "color_primaries"; -- enum
-	int, "color_trc";
-	int, "colorspace";
-	int, "color_range";
-	int, "chroma_sample_location";
-	int, "slices";
-	int, "field_order";
-	int, "sample_rate";
-	int, "channels";
-	int, "sample_fmt";
-	int, "frame_size";
-	int, "frame_number";
-	int, "block_align";
-	
-	int, "cutoff";
-	uint64, "channel_layout";
-	uint64, "request_channel_layout";
-	int, "audio_service_type";
-	int, "request_sample_fmt";
-	pointer, "get_buffer2";
-	int, "refcounted_frames";
-	float, "qcompress";
-	float, "qblur";
-	int, "qmin";
-	int, "qmax";
-	
-	int, "max_qdiff";
-	int, "rc_buffer_size";
-	int, "rc_override_count";
-	pointer, "rc_override";
-	
-	sint64, "rc_max_rate";
-	sint64, "rc_min_rate";
-	float, "rc_max_available_vbv_use";
-	float, "rc_min_vbv_overflow_use";
-	
-	int, "rc_initial_buffer_occupancy";
-	int, "coder_type";
-	int, "context_model";
-	int, "frame_skip_threshold";
-	int, "frame_skip_factor";
-	int, "frame_skip_exp";
-	int, "frame_skip_cmp";
-	int, "trellis";
-	int, "min_prediction_order";
-	int, "max_prediction_order";
-	
-	sint64, "timecode_frame_start";
-	pointer, "rtp_callback";
-	int, "rtp_payload_size";
-	int, "mv_bits";
-	int, "header_bits";
-	int, "i_tex_bits";
-	int, "p_tex_bits";
-	int, "i_count";
-	int, "p_count";
-	int, "skip_count";
-	int, "misc_bits";
-	int, "frame_bits";
-	pointer, "stats_out";
-	pointer, "stats_in";
-	int, "workaround_bugs";
-	int, "strict_std_compliance";
-	int, "error_concealment";
-	int, "debug";
-	int, "err_recognition"; --TODO continue.
-	
-	int64_t,"reordered_opaque";
-	pointer, "hwaccel";
-	pointer, "hwaccel_context";
-	arr_error, "error";
-	
-	int, "dct_algo";
-	int, "idct_algo";
-	int, "bits_per_coded_sample";
-	int, "bits_per_raw_sample";
-	int, "lowres";
-	pointer, "coded_frame";
-	int, "thread_count";
-	int, "thread_type";
-	int, "active_thread_type";
-	int, "thread_safe_callbacks";
-	pointer, "execute";
-	pointer, "execute2";
-	
-	int, "nsse_weight";
-	int, "profile";
-	int, "level";
-	int, "skip_loop_filter"; -- enum
-	int, "skip_idct";
-	int, "skip_frame";
-	pointer, "subtitle_header";
-	int, "subtitle_header_size";
-	uint64_t, "vbv_delay";
-	int, "side_data_only_packets";
-	int, "initial_padding";
-	stru_AVRational.copy(), "framerate";
-	
-	int, "sw_pix_fmt";
-	stru_AVRational.copy(), "pkt_timebase";
-	pointer, "codec_descriptor";
-	int64_t, "pts_correction_num_faulty_pts";
-	int64_t, "pts_correction_num_faulty_dts";
-	int64_t, "pts_correction_last_pts";
-	int64_t, "pts_correction_last_dts";
-	pointer, "sub_charenc";
-	int, "sub_charenc_mode";
-	int, "skip_alpha";
-	int, "seek_preroll";
-	int, "debug_mv";
-	pointer, "chroma_intra_matrix";
-	
-	pointer, "dump_separator";
-	pointer, "codec_whitelist";
-	int, "properties"; --unsigned
-	pointer, "coded_side_data";
-	int, "nb_coded_side_data";
-	pointer, "hw_frames_ctx";
-	int, "sub_text_format";
-	int, "trailing_padding";
-	int64_t, "max_pixels";
-	pointer, "hw_device_ctx";
-	int, "hwaccel_flags";
-	int, "apply_cropping";
-	int, "extra_hw_frames";
-	
-	int, "discard_damaged_percentage";
-	int64_t, "max_samples";
-	int, "export_side_data";
-	pointer, "get_encode_buffer";
-}
+local stru_context = ffmpeg_structs.avcontext
 c.as(stru_context)
 
+-- 6, avcodec_open2(...)
 -- if (avcodec_open2(c, codec, NULL) < 0) ...
+print("--- 6, start call 'avcodec.avcodec_open2(...)' ---")
 if(avcodec.avcodec_open2{ret = hffi.value(int), c, codec}.get() < 0) then
 	print("Could not open codec\n")	
 	os.exit(1)	
 end
 
--- f = fopen(filename, "rb");
-local f = c_runtime.fopen {ret = hffi.valuePtr(void), hffi.valuePtr(filename), hffi.valuePtr("rb") } 
+-- 7, f = fopen(filename, "rb");
+print("--- 7, start call 'c_runtime.fopen(...)' ---")
+local f = c_runtime.fopen {ret = hffi.valuePtr(void), filename, "rb"} 
 check_ptr(f, "Could not open "..filename)
 
--- frame = av_frame_alloc();
-local frame = avcodec.av_frame_alloc({ret = hffi.valuePtr(void)})
+-- 8, frame = av_frame_alloc();
+print("--- 8, start call 'avutil.av_frame_alloc(...)' ---")
+local frame = avutil.av_frame_alloc({ret = hffi.valuePtr(void)})
 check_ptr(frame, "Could not allocate video frame\n")
+local stru_frame = ffmpeg_structs.avframe;
+frame.as(stru_frame)
 
 
-local function pgm_save(buf, wrap,  xsize, ysize, filename)
-					 
+local function pgm_save(buf, linesize, xsize, ysize, filename)
+	local f = c_runtime.fopen{ret = hffi.valuePtr(void); filename, "wb"}	
+	c_runtime.fprintf {ret = int; var_count = 3; f, "P5\n%d %d\n%d\n", xsize, ysize, hffi.value(int, 255)}
+	local val_c = hffi.value(size_t, 0);
+	local val_1 = hffi.value(size_t, 1);
+	local val_xsize = hffi.value(size_t, xsize.get());
+	local data = hffi.valuePtr(void)
+	local arr_buf = buf.get();
+	for i = 1, ysize.get(), 1 do
+		data.setPtr(arr_buf, (i - 1) * linesize.get())
+		-- size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
+		c_runtime.fwrite{ret = val_c; data, val_1, val_xsize, f}
+	end
+	c_runtime.fclose{f}
 end
 
 -- static void decode(AVCodecContext *dec_ctx, AVFrame *frame, AVPacket *pkt, const char *filename)
-local function decode(c, stru_context, frame, stru_pkt, outfilename)
+local function decode(c, stru_context, frame, stru_frame, stru_pkt, filename)
+	print("--- decode ---")
 	--TODO 
-	local val_ret = avcodec.avcodec_send_packet({ret=int;c, stru_pkt})
+	local val_ret = avcodec.avcodec_send_packet({ret = int; c, hffi.valuePtr(stru_pkt)})
+	print("avcodec.avcodec_send_packet: result = ", val_ret)
 	check_state(val_ret.get() < 0, "Error sending a packet for decoding\n");
 	
 	local arr_buf = hffi.array(sint8, 1024)
 	local buf = hffi.valuePtr(arr_buf)
+	
+	local val_width = hffi.value(int, 0)
+	local val_height = hffi.value(int, 0)
+	local val_frame_num = hffi.value(int, 0)
+	local val_linesize0 = hffi.value(int, 0)
+
 	while(val_ret.get() >= 0) do
 		avcodec.avcodec_receive_frame {ret = val_ret; c, frame}
 		if(val_ret.get() == EAGAIN) then
@@ -367,11 +143,21 @@ local function decode(c, stru_context, frame, stru_pkt, outfilename)
 			return
 		end
 		check_state(val_ret.get() < 0, "Error during decoding\n");
-		c_runtime.printf{var_count = 1, "saving frame %3d\n", stru_context.frame_number}
+		frame.as(stru_frame)
+		c.as(stru_context)
+		-- sync width and height
+		val_width.set(stru_frame.width)
+		val_height.set(stru_frame.height)
+		val_frame_num.set(stru_context.frame_number)
+		val_linesize0.set(stru_frame.linesize[0])
+		
+		c_runtime.printf{var_count = 1; "saving frame %3d\n", val_frame_num}
 		c_runtime.fflush{stdout}
-		c_runtime.snprintf{buf, 1024, "%s-%d", filename, stru_context.frame_number}
+		c_runtime.snprintf{var_count = 2; buf, 1024, "%s-%d", filename, val_frame_num}
 		--print("saving frame: ", stru_context.frame_number)
 		--print(filename.."-"..stru_context.frame_number)
+		pgm_save(stru_frame.data[0], val_linesize0, 
+			val_width, val_height, buf)
 	end
 end
 
@@ -390,7 +176,7 @@ local offset = 0;
 while(true) do
 	_ret = c_runtime.feof({ret = val_int, f}).get()
 	print("c_runtime.feof: result: "..tostring(_ret))
-	if(_ret == 0) then
+	if(_ret ~= 0) then
 		print("c_runtime.feof:  end.")
 		break;
 	end
@@ -398,6 +184,7 @@ while(true) do
 	
 	--data_size = fread(inbuf, 1, INBUF_SIZE, f);
 	c_runtime.fread{ret = data_size ; hffi.valuePtr(inbuf), hffi.value(uint, 1), hffi.value(uint, INBUF_SIZE), f}
+	print("c_runtime.fread: ", data_size)
 	if data_size.get() == 0 then
 		break;
 	end
@@ -407,27 +194,30 @@ while(true) do
 	while(data_size.get() > 0) do
 		--  ret = av_parser_parse2(parser, c, &pkt->data, &pkt->size,
         --                           data, data_size, AV_NOPTS_VALUE, AV_NOPTS_VALUE, 0); 
+		print("--- avcodec.av_parser_parse2 ---")
 		_ret = avcodec.av_parser_parse2({ret = val_int; parser, c, pkt_data_ptr, pkt_size_ptr, 
 				data, data_size, AV_NOPTS_VALUE, AV_NOPTS_VALUE, ZERO}).get()
 		if(_ret < 0) then 
 			print("Error while parsing\n")
 			os.exit(1)
 		end	
+		-- sync ctx
+		c.as(stru_context)
 		-- reset pkt size.
 		stru_pkt.size = pkt_size_ptr.get()	
 		--  data      += ret;	data_size -= ret; 	
-		offset += _ret;
+		offset = offset + _ret;
 		data_size.add(-_ret)
 		data.setPtr(inbuf, offset)
 		
 		-- if (pkt->size) decode(c, frame, pkt, outfilename);
-		if(pkt_size_ptr.get() != 0) then
-			decode(c, stru_context, frame, stru_pkt, outfilename);
+		if(pkt_size_ptr.get() ~= 0) then
+			decode(c, stru_context, frame, stru_frame, stru_pkt, outfilename);
 		end
 	end
 end
  -- /* flush the decoder */
-decode(c, stru_context, frame, nil, outfilename);
+decode(c, stru_context, frame, stru_frame, nil, outfilename);
 -- fclose(f);
 c_runtime.fclose{f}
 f.ptrToNull()
@@ -443,7 +233,7 @@ parser.ptrToNull()
 avcodec.avcodec_free_context({c.ptrValue()})
 c.ptrToNull()
 
-avcodec.av_frame_free({frame.ptrValue()})
+avutil.av_frame_free({frame.ptrValue()})
 frame.ptrToNull()
 
 avcodec.av_packet_free({pkt.ptrValue()})

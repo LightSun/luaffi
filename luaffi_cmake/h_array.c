@@ -229,9 +229,9 @@ harray* harray_copy(harray* src){
     arr->free_data = 1;
     arr->ele_list = NULL;
     arr->hffi_t = src->hffi_t;
+    arr->free_data = 1;
     if(src->data){
         arr->data = MALLOC(src->data_size);
-        arr->free_data = 1;
     }else{
         arr->data = NULL;
     }
