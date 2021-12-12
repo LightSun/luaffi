@@ -7,6 +7,7 @@ print("-------- start test_ffmpeg---------");
 AV_INPUT_BUFFER_PADDING_SIZE = 64
 -- enum 
 AV_CODEC_ID_MPEG1VIDEO = 1
+AV_CODEC_ID_MPEG4 = 12
 
 local function check_ptr(val, msg)
 	if not val.hasData() then
@@ -24,7 +25,7 @@ end
 
 local INBUF_SIZE = 4096
 -- ./decode_video ~/Videos/MyVideo.mpeg ~/Videos/frame
-local filename = "foreman.mpeg"; -- TODO '.mpeg'
+local filename = "foreman.mp4"; -- TODO '.mpeg'
 local outfilename = "foreman";
 
 hffi.defines();
@@ -61,7 +62,7 @@ pkt.as(stru_pkt)
 local stru_codec = ffmpeg_structs.avcodec;
 
 print("--- 3, start call 'avcodec.avcodec_find_decoder(...)' ---")
-local codec = avcodec.avcodec_find_decoder{ret = hffi.valuePtr(void), hffi.value(int, AV_CODEC_ID_MPEG1VIDEO)}
+local codec = avcodec.avcodec_find_decoder{ret = hffi.valuePtr(void), hffi.value(int, AV_CODEC_ID_MPEG4)}
 check_ptr(codec, "Codec not found\n")
 
 codec.as(stru_codec)
@@ -78,12 +79,12 @@ check_ptr(parser, "Could not allocate video codec context\n")
 
 -- struct AVCodecContext
 local stru_context = ffmpeg_structs.avcontext
-c.as(stru_context)
+--c.as(stru_context)
 
 -- 6, avcodec_open2(...)
 -- if (avcodec_open2(c, codec, NULL) < 0) ...
 print("--- 6, start call 'avcodec.avcodec_open2(...)' ---")
-if(avcodec.avcodec_open2{ret = hffi.value(int), c, codec}.get() < 0) then
+if(avcodec.avcodec_open2{ret = hffi.value(int), c, codec, nil}.get() < 0) then
 	print("Could not open codec\n")	
 	os.exit(1)	
 end
@@ -135,7 +136,7 @@ local function decode(c, stru_context, frame, stru_frame, stru_pkt, filename)
 
 	while(val_ret.get() >= 0) do
 		avcodec.avcodec_receive_frame {ret = val_ret; c, frame}
-		if(val_ret.get() == EAGAIN) then
+		if(val_ret.get() == -EAGAIN) then
 			return
 		end
 		-- TODO latter handle EOF. (  FFERRTAG( 'E','O','F',' ') )
@@ -163,6 +164,7 @@ end
 
 local val_int = hffi.value(int, 0)
 local data_size = hffi.value(uint, 0)
+local data_size_int = hffi.value(int, 0)
 local _ret;
 -- &pkt->data
 local pkt_data_ptr = stru_pkt.data.ptrValue(); 
@@ -171,7 +173,7 @@ local pkt_size_ptr = hffi.value(pointer, int, stru_pkt.size)
 local data = hffi.valuePtr(void)
 local AV_NOPTS_VALUE = hffi.value(sint64, 0x8000000000000000)
 print("AV_NOPTS_VALUE:", AV_NOPTS_VALUE.get())
-local ZERO = hffi.value(int, 0)
+local ZERO = hffi.value(sint64, 0)
 local offset = 0;
 while(true) do
 	_ret = c_runtime.feof({ret = val_int, f}).get()
@@ -183,6 +185,7 @@ while(true) do
 	print("c_runtime.feof: "..tostring(_ret))
 	
 	--data_size = fread(inbuf, 1, INBUF_SIZE, f);
+	-- size_t fread(void *buf, size_t size, size_t count, FILE *fp);
 	c_runtime.fread{ret = data_size ; hffi.valuePtr(inbuf), hffi.value(uint, 1), hffi.value(uint, INBUF_SIZE), f}
 	print("c_runtime.fread: ", data_size)
 	if data_size.get() == 0 then
@@ -191,12 +194,22 @@ while(true) do
 	-- data = inbuf
 	offset = 0;
 	data.setPtr(inbuf, offset)
-	while(data_size.get() > 0) do
+	data_size_int.set(data_size)
+	while(data_size_int.get() > 0) do
 		--  ret = av_parser_parse2(parser, c, &pkt->data, &pkt->size,
         --                           data, data_size, AV_NOPTS_VALUE, AV_NOPTS_VALUE, 0); 
 		print("--- avcodec.av_parser_parse2 ---")
+		--[[
+		int av_parser_parse2(AVCodecParserContext *s,
+                     AVCodecContext *avctx,
+                     uint8_t **poutbuf, int *poutbuf_size,
+                     const uint8_t *buf, int buf_size,
+                     int64_t pts, int64_t dts, int64_t pos);
+		]]--
 		_ret = avcodec.av_parser_parse2({ret = val_int; parser, c, pkt_data_ptr, pkt_size_ptr, 
-				data, data_size, AV_NOPTS_VALUE, AV_NOPTS_VALUE, ZERO}).get()
+				data, data_size_int, AV_NOPTS_VALUE, AV_NOPTS_VALUE, ZERO}).get()
+		print("avcodec.av_parser_parse2: ret = ", _ret)
+		print("avcodec.av_parser_parse2: stru_pkt.size = ", pkt_size_ptr.get())
 		if(_ret < 0) then 
 			print("Error while parsing\n")
 			os.exit(1)
@@ -205,9 +218,10 @@ while(true) do
 		c.as(stru_context)
 		-- reset pkt size.
 		stru_pkt.size = pkt_size_ptr.get()	
-		--  data      += ret;	data_size -= ret; 	
+		--  data      += ret;	
+		--  data_size -= ret; 	
 		offset = offset + _ret;
-		data_size.add(-_ret)
+		data_size_int.add(-_ret)
 		data.setPtr(inbuf, offset)
 		
 		-- if (pkt->size) decode(c, frame, pkt, outfilename);
