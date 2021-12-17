@@ -33,6 +33,7 @@ typedef struct hffi_value{
     void* ptr;                      // may be data-ptr/struct-ptr/harray-ptr
     ffi_type* ffi_type;             // cache ffi_type
     struct array_list* sub_types;   // mallocated sub types. need free on release
+    struct hffi_value* shared;
 }hffi_value;
 
 //struct member type

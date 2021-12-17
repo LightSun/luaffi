@@ -384,6 +384,7 @@ hffi_value* hffi_new_value_closure(hffi_closure* c){
 }
 hffi_value* hffi_new_value_harray(struct harray* arr){
     hffi_value* val_ptr = MALLOC(sizeof(hffi_value));
+    memset(val_ptr, 0, sizeof (hffi_value));
     val_ptr->should_free_ptr = 1;
     val_ptr->sub_types = array_list_new2(4);
     val_ptr->ffi_type = __harray_to_ffi_type(FFI_DEFAULT_ABI, arr, val_ptr->sub_types);
@@ -489,6 +490,10 @@ void hffi_delete_value(hffi_value* val){
         //types
         if(val->sub_types){
             array_list_delete2(val->sub_types, __release_ffi_type_simple);
+        }
+        if(val->shared_val){
+            hffi_delete_value(val->shared_val);
+            val->shared_val = NULL;
         }
         FREE(val);
     }

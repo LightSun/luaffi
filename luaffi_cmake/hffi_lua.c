@@ -1161,6 +1161,21 @@ static int __hiff_value_ptr_value(lua_State *L){
     newVal->should_free_ptr = 0;
     return push_ptr_hffi_value(L, newVal);
 }
+static int __hiff_value_shared_ptr_value(lua_State *L){
+    hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
+    hffi_value* shared_val;
+    if(val->shared_val == NULL){
+        shared_val = hffi_new_value_ptr_nodata(HFFI_TYPE_VOID);
+        shared_val->ptr = &val->ptr;
+        //as this ptr is not alloc by self value.
+        shared_val->should_free_ptr = 0;
+        val->shared_val = shared_val;
+    }else{
+        shared_val = val->shared_val;
+    }
+    hffi_value_ref(shared_val, 1);
+    return push_ptr_hffi_value(L, shared_val);
+}
 static int __hiff_value_setPtr(lua_State *L){
     //array, offset
     hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
@@ -1190,6 +1205,7 @@ static int xffi_value_index(lua_State *L){
         __INDEX_METHOD("ptrToNull", __hiff_value_ptr_null);
         //the pointer to current value.
         __INDEX_METHOD("ptrValue", __hiff_value_ptr_value);
+        __INDEX_METHOD("sharedPtrValue", __hiff_value_shared_ptr_value);
         __INDEX_METHOD("setPtr", __hiff_value_setPtr);
     }
     return 0;
