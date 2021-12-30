@@ -1,5 +1,6 @@
 
 #include <stdlib.h>
+#include <string.h>
 #include "h_alloctor.h"
 
 typedef void (*Free)(void*);
@@ -27,6 +28,13 @@ void* h_alloctor_realloc(void* old_data, int new_size){
 
 void* h_alloctor_alloc(int new_size){
     return __h_alloc(NULL, new_size);
+}
+void* h_alloctor_calloc(int new_size){
+    void* d = __h_alloc(NULL, new_size);
+    if(d){
+        memset(d, 0, new_size);
+    }
+    return d;
 }
 
 void h_alloctor_free(void* data){
