@@ -1,5 +1,5 @@
 --[[
-band: &&
+band: &
 bnot: ! (1->0, 0->1)
 bor: | (or)
 bxor:   same to 0, diff to 1(diff-or)
@@ -46,6 +46,25 @@ function ints.shift_bor2(str)
 		end
 		return bit32.lshift(b, (i - 1) * 8) -- <<
 	end);
+end
+
+function ints.addFlags(...)
+	local a = {...}
+	local flags = 0;
+	for i = 1, #a do 
+		flags = bit32.bor(flags, a[i]) 
+	end
+	return flags;
+end
+
+function ints.deleteFlags(total, flags)
+	local hbits = require("core.util.bits")
+	return hbits.BitToNum10(hbits.BitAnd(total, hbits.BitToNum10(hbits.BitNot(flags))))
+end
+
+function ints.hasFlags(total, flags)
+	local hbits = require("core.util.bits")
+	return hbits.BitToNum10(hbits.BitAnd(total, flags)) == flags
 end
 
 return ints;
