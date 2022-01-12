@@ -1,0 +1,21 @@
+typedef struct S{
+    double c;
+}S;
+
+struct AVCodecInternal {
+    int64_t c;
+};
+
+#define COUNT 5
+struct A {
+	int age;
+	const char* name;
+	char a;
+	unsigned char a1;
+    struct AVCodecInternal _avi;
+    struct AVCodecInternal _av2[3];
+    struct S* _s;
+    struct S* A3;
+    struct S _s2;
+    struct S _s3[COUNT];
+};

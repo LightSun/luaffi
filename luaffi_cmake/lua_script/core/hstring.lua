@@ -28,6 +28,34 @@ function m.newHString(str)
 	function self.skip(count)
 		pos = pos + count
 	end
+
+	function self.skipWord(c, except_chars)
+		if not c then
+			c = 1
+		else
+			assert(type(c) == "number")
+		end
+		for i = 1, c do
+			self.nextWord(except_chars)
+			if(i ~= c) then
+				self.skipSpace()
+			end
+		end
+	end
+
+	function self.skipText(c, except_chars)
+		if not c then
+			c = 1
+		else
+			assert(type(c) == "number")
+		end
+		for i = 1, c do
+			self.nextText(except_chars)
+			if(i ~= c) then
+				self.skipSpace()
+			end
+		end
+	end
 		
 	function self.requireChar(ch)
 		assert(type(ch) == 'string')
@@ -36,11 +64,12 @@ function m.newHString(str)
 	end
 	
 	function self.startsWith(s)
+		assert(type(s) == "string")
 		if #s > #_str - pos + 1 then
 			return nil
 		end
 		local si = 1
-		for i = pos, #_str do 
+		for i = pos, #_str do
 			if(string.byte(string.sub(_str, i, i)) ~= string.byte(string.sub(s, si, si)) ) then
 				return nil;
 			end
@@ -51,6 +80,20 @@ function m.newHString(str)
 		end
 		return true;
 	end
+
+	function self.endsWith(s)
+		assert(type(s) == "string")
+		local si = #s;
+		for i = #_str, pos, -1 do
+			if(string.byte(string.sub(_str, i, i)) ~= string.byte(string.sub(s, si, si)) ) then
+				return nil;
+			end
+			si = si - 1;
+			if(si < 1) then
+				break;
+			end
+		end
+	end
 	
 	function self.length()
 		return #_str - pos + 1;
@@ -60,7 +103,7 @@ function m.newHString(str)
 	function self.nextWord(except_chars)
 		-- must start with letter. $_
 		self.save()
-		local res =  self.nextText(except_chars);
+		local res = self.nextText(except_chars);
 		if res then
 			local pat =  "^[%a$_][%a%d$_]*"
 			local pr = string.match(res, pat);
@@ -176,7 +219,10 @@ function m.newHString(str)
 	end
 	
 	function self.nextArrayElementCount(ctx)
-		assert(strings.charAt(_str, pos) == string.byte("["), "for nextArrayElementCount. require '[${number}]'")
+		--assert(strings.charAt(_str, pos) == string.byte("["), "for nextArrayElementCount. require '[${number}]'")
+		if strings.charAt(_str, pos) ~= string.byte("[") then
+			return 0;
+		end
 		local code_end = string.byte("]");
 		local count = 0;
 		for i = pos + 1, #_str do 
@@ -186,10 +232,11 @@ function m.newHString(str)
 			count = count + 1 ;
 		end
 		if(count == 0) then
-			return nil;
+			return 0;
 		end
 		local numStr = string.sub(_str, pos + 1, pos + count)
-		assert(strings.count(numStr, ".")== 0, "must be integer")
+		print("numStr >>> ", numStr)
+		assert(strings.count(numStr, ".") ~= 0, "must be integer")
 		local num = tonumber(numStr)
 		-- may be from '#define a 3'
 		if( num == nil) then
