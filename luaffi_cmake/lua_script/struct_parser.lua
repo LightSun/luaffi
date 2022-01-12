@@ -108,9 +108,18 @@ local function newContext(c)
 		--print("============ add struct: ", name)
 		table.insert(tab_structs, name)
 		cur_struct_name = name;
+		-- #define no_data_name
 		self.appendLine("local "..self.getStructObjName(name).." = hffi.struct({")
-		self.appendLine("no_data = true ;")
-		self.appendLine("free_data = false ;")
+		if(self.defined(string.format("HAS_DATA_%s", name))) then
+			self.appendLine("no_data = false ;")
+		else
+			self.appendLine("no_data = true ;")  -- default
+		end
+		if(self.defined(string.format("FREE_DATA_%s", name))) then
+			self.appendLine("free_data = true ;")
+		else
+			self.appendLine("free_data = false ;") -- default
+		end
 	end
 
 	function self.endStruct()
@@ -146,7 +155,9 @@ local function newContext(c)
 		end
 		tab_defines[var] = value;
 	end
-
+	function self.defined(s)
+		return tab_defines and tab_defines[s] ~= nil
+	end
 	function self.getInt(s)
 		if not tab_defines then
 			error(string.format("can't find number for %s", s))

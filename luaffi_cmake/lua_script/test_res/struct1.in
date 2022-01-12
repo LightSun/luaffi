@@ -2,6 +2,11 @@ typedef struct S{
     double c;
 }S;
 
+//indicate the struct of AVCodecInternal has init data.
+#define HAS_DATA_AVCodecInternal 1
+//indicate the struct of AVCodecInternal will free data self.
+#define FREE_DATA_AVCodecInternal 1
+
 struct AVCodecInternal {
     int64_t c;
 };
