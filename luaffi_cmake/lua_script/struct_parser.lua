@@ -10,7 +10,8 @@
 parse the stand c struct define to hffi.
 ]]--
 local hstring = require("core.hstring")
-local strings = require("core.util.Strings")
+local strings = require("core.util.strings")
+local file_reader = require("core.util.file_reader")
 local ints = require("ints")
 --[[
 {"sint8", HFFI_TYPE_SINT8},
@@ -164,6 +165,13 @@ local function newContext(c)
 		end
 		return tab_defines[s]
 	end
+
+	function self.get(s)
+		if not tab_defines then
+			error(string.format("can't find number for %s", s))
+		end
+		return tab_defines[s]
+	end
 	------------------------------------
 
 	function self.appendLine(l, before_cur_struct)
@@ -300,12 +308,109 @@ end
 --[[
 #if FF_API_UNSANITIZED_BITRATES
     int max_bitrate;
+#elseif
+
 #else
     int64_t max_bitrate;
 #endif
 ]]
-local function handle_ifelse_expre(ctx, line, func_next_line)
+local function handle0_ifelse(ctx, name, reader)
+	local val = ctx.get(name)
+	local tab_lines = {};
+	local func_collect = function(lineNum, line1)
+		table.insert(tab_lines, line1)
+	end
+	if val and val ~= 0 then
+		-- has define
+		local should_skip_to_endif;
+		reader.skipLineUntil(function(lineNum, line1)
 
+			if(strings.startsWith(line1, "#elseif") or strings.startsWith(line1, "#else") ) then
+				-- append to next read
+				reader.appendLines(tab_lines)
+				tab_lines = {};
+				-- skip to endif
+				should_skip_to_endif = true;
+				return true;
+			elseif strings.startsWith(line1, "#endif") then
+				-- append to next read
+				reader.appendLines(tab_lines)
+				tab_lines = {};
+				return true;
+			end
+		end, func_collect)
+
+		if should_skip_to_endif then
+			reader.skipLineUntil(function(lineNum, line1)
+				if strings.startsWith(line1, "#endif") then
+					return true;
+				end
+			end, nil)
+		end
+	else
+		local keyword;
+		reader.skipLineUntil(function(lineNum, line1)
+			if strings.startsWith(line1, "#elseif") then
+				local hsl = hstring.newHString(line1)
+				hsl.skipText(1)
+				hsl.skipSpace()
+				keyword = hsl.nextWord();
+				return true;
+			elseif strings.startsWith(line1, "#else") then
+				--todo handle
+				return true;
+			end
+		end, nil)
+		if(keyword) then
+			handle0_ifelse(ctx, keyword, reader);
+		end
+	end
+end
+local function handle_ifelse_expre(ctx, hs_line, reader)
+	local name = hs_line.nextWord()
+	local val = ctx.get(name)
+	local tab_lines = {};
+	local func_collect = function(lineNum, line1)
+		table.insert(tab_lines, line1)
+	end
+	if val and val ~= 0 then
+		-- has define
+		local should_skip_to_endif;
+		reader.skipLineUntil(function(lineNum, line1)
+
+			if(strings.startsWith(line1, "#else")) then
+				-- append to next read
+				reader.appendLines(tab_lines)
+				tab_lines = {};
+				-- skip to endif
+				should_skip_to_endif = true;
+				return true;
+			elseif strings.startsWith(line1, "#endif") then
+				-- append to next read
+				reader.appendLines(tab_lines)
+				tab_lines = {};
+				return true;
+			end
+		end, func_collect)
+
+		if should_skip_to_endif then
+			reader.skipLineUntil(function(lineNum, line1)
+				if strings.startsWith(line1, "#endif") then
+					return true;
+				end
+			end, nil)
+		end
+	else
+		reader.skipLineUntil(function(lineNum, line1)
+			if strings.startsWith(line1, "#elseif") then
+				local hsl = hstring.newHString(line1)
+				hsl.skipText(1)
+				hsl.skipSpace()
+				hsl.nextWord()
+				return true;
+			end
+		end, nil)
+	end
 end
 --[[
 handle #define and typedef
@@ -344,6 +449,7 @@ local function parseLine(ctx, line, lineNum)
 	end
 	--todo support 'if elseif else endif'
 	if line.startsWith("#") then-- #define, #if
+		-- handle_ifelse_expre(ctx, )
 		return nil;
 	end
 	local info = newCtypeInfo(ctx);
@@ -455,29 +561,11 @@ local self = {};
 --str: the struct desc from C.
 function self.convertStruct(str)
 
-	local file = io.open(str)
-	if not file then
-		return nil;
-	end
-
+	local reader = file_reader.open(str)
 	local ctx = newContext()
-	local line;
-	local lineNum = 1;
-	while(true) do
-		line = file:read("l") -- read a line
-		if(line) then
-			parseLine(ctx, hstring.newHString(line), lineNum)
-			lineNum = lineNum + 1
-		else
-			break;
-		end
-	end
---[[ --ok
-	for line in file:lines() do
-		parseLine(ctx, hstring.newHString(line))
-	end
-]]
-	io.close(file)
+	reader.stream(function(r, lineNum, line)
+		parseLine(ctx, hstring.newHString(line), lineNum)
+	end)
 	print("-------- convertStruct result: ")
 	print(ctx.outStr())
 end

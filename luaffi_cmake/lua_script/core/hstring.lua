@@ -1,5 +1,5 @@
 
-local strings = require "core.util.Strings"
+local strings = require "core.util.strings"
 
 local m = {}
 

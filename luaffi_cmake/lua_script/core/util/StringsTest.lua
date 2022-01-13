@@ -1,5 +1,5 @@
 
-local m = require("core.util.Strings")
+local m = require("core.util.strings")
 
 local a = "a/n/c.d"
 assert(m.endsWidth(a, "c.d"));
