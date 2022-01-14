@@ -305,6 +305,29 @@ local function evalExpression(ctx, expre)
 	--todo latter support more
 	return tonumber(expre)
 end
+
+local BLOCK_TYPE_IF     = 1
+local BLOCK_TYPE_ELSEIF = 2
+local BLOCK_TYPE_ELSE   = 3
+local BLOCK_TYPE_ENDIF  = 4
+local function newBlockInfo(_type, expre)
+	local self = {}
+	local tab_lineNums = {}
+	local tab_lines = {}
+	local type0 = _type;
+	local expre = expre;
+
+	function self.setLineNums(line_nums)
+		tab_lineNums = line_nums;
+	end
+	function self.setLines(_lines)
+		tab_lines = _lines;
+	end
+	function self.getType()
+		return type0;
+	end
+	return self;
+end
 --[[
 #if FF_API_UNSANITIZED_BITRATES
     int max_bitrate;
@@ -367,50 +390,40 @@ local function handle0_ifelse(ctx, name, reader)
 	end
 end
 local function handle_ifelse_expre(ctx, hs_line, reader)
+	local hs = hstring.newHString("---")
 	local name = hs_line.nextWord()
-	local val = ctx.get(name)
+	local blocks = {}
+	local bi = newBlockInfo(BLOCK_TYPE_IF, name)
+	-- tmp table
+	local tab_lineNums = {};
 	local tab_lines = {};
 	local func_collect = function(lineNum, line1)
+		table.insert(tab_lineNums, lineNum)
 		table.insert(tab_lines, line1)
 	end
-	if val and val ~= 0 then
-		-- has define
-		local should_skip_to_endif;
-		reader.skipLineUntil(function(lineNum, line1)
-
-			if(strings.startsWith(line1, "#else")) then
-				-- append to next read
-				reader.appendLines(tab_lines)
-				tab_lines = {};
-				-- skip to endif
-				should_skip_to_endif = true;
-				return true;
-			elseif strings.startsWith(line1, "#endif") then
-				-- append to next read
-				reader.appendLines(tab_lines)
-				tab_lines = {};
-				return true;
-			end
-		end, func_collect)
-
-		if should_skip_to_endif then
-			reader.skipLineUntil(function(lineNum, line1)
-				if strings.startsWith(line1, "#endif") then
-					return true;
-				end
-			end, nil)
-		end
-	else
-		reader.skipLineUntil(function(lineNum, line1)
-			if strings.startsWith(line1, "#elseif") then
-				local hsl = hstring.newHString(line1)
-				hsl.skipText(1)
-				hsl.skipSpace()
-				hsl.nextWord()
-				return true;
-			end
-		end, nil)
+	local func_block_type = function(_lineStr, block_type)
+		-- set to info and save to blocks
+		bi.setLineNums(tab_lineNums)
+		bi.setLines(tab_lines)
+		table.insert(blocks, bi)
+		-- next block
+		hs.reset(_lineStr)
+		hs.skipText(1)
+		hs.skipSpace();
+		bi = newBlockInfo(block_type, hs.nextWord())
+		tab_lineNums = {}
+		tab_lines = {}
 	end
+	reader.skipLineUntil(function(_, line1)
+		if(strings.startsWith(line1, "#elseif")) then
+			func_block_type(line1, BLOCK_TYPE_ELSEIF)
+		elseif (strings.startsWith(line1, "#else")) then
+			func_block_type(line1, BLOCK_TYPE_ELSE)
+		elseif strings.startsWith(line1, "#endif") then
+			return true;
+		end
+	end, func_collect)
+
 end
 --[[
 handle #define and typedef
