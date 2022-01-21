@@ -309,13 +309,13 @@ end
 local BLOCK_TYPE_IF     = 1
 local BLOCK_TYPE_ELSEIF = 2
 local BLOCK_TYPE_ELSE   = 3
-local BLOCK_TYPE_ENDIF  = 4
+-- local BLOCK_TYPE_ENDIF  = 4
 local function newBlockInfo(_type, expre)
 	local self = {}
 	local tab_lineNums = {}
 	local tab_lines = {}
 	local type0 = _type;
-	local expre = expre;
+	local _expre = expre;
 
 	function self.setLineNums(line_nums)
 		tab_lineNums = line_nums;
@@ -325,6 +325,12 @@ local function newBlockInfo(_type, expre)
 	end
 	function self.getType()
 		return type0;
+	end
+	function self.getExpre()
+		return _expre;
+	end
+	function self.getLines()
+		return tab_lines;
 	end
 	return self;
 end
@@ -337,93 +343,84 @@ end
     int64_t max_bitrate;
 #endif
 ]]
-local function handle0_ifelse(ctx, name, reader)
-	local val = ctx.get(name)
-	local tab_lines = {};
-	local func_collect = function(lineNum, line1)
-		table.insert(tab_lines, line1)
-	end
-	if val and val ~= 0 then
-		-- has define
-		local should_skip_to_endif;
-		reader.skipLineUntil(function(lineNum, line1)
-
-			if(strings.startsWith(line1, "#elseif") or strings.startsWith(line1, "#else") ) then
-				-- append to next read
-				reader.appendLines(tab_lines)
-				tab_lines = {};
-				-- skip to endif
-				should_skip_to_endif = true;
-				return true;
-			elseif strings.startsWith(line1, "#endif") then
-				-- append to next read
-				reader.appendLines(tab_lines)
-				tab_lines = {};
-				return true;
-			end
-		end, func_collect)
-
-		if should_skip_to_endif then
-			reader.skipLineUntil(function(lineNum, line1)
-				if strings.startsWith(line1, "#endif") then
-					return true;
-				end
-			end, nil)
-		end
-	else
-		local keyword;
-		reader.skipLineUntil(function(lineNum, line1)
-			if strings.startsWith(line1, "#elseif") then
-				local hsl = hstring.newHString(line1)
-				hsl.skipText(1)
-				hsl.skipSpace()
-				keyword = hsl.nextWord();
-				return true;
-			elseif strings.startsWith(line1, "#else") then
-				--todo handle
-				return true;
-			end
-		end, nil)
-		if(keyword) then
-			handle0_ifelse(ctx, keyword, reader);
-		end
-	end
-end
 local function handle_ifelse_expre(ctx, hs_line, reader)
-	local hs = hstring.newHString("---")
-	local name = hs_line.nextWord()
+	hs_line.skipText() -- skip '#if'
+	local hs = hstring.newHString("---") -- just holder
+	local name = hs_line.nextText()
 	local blocks = {}
 	local bi = newBlockInfo(BLOCK_TYPE_IF, name)
 	-- tmp table
 	local tab_lineNums = {};
 	local tab_lines = {};
 	local func_collect = function(lineNum, line1)
-		table.insert(tab_lineNums, lineNum)
-		table.insert(tab_lines, line1)
+		if(not strings.startsWith(line1, "#")) then
+			table.insert(tab_lineNums, lineNum)
+			table.insert(tab_lines, line1)
+		end
 	end
 	local func_block_type = function(_lineStr, block_type)
 		-- set to info and save to blocks
 		bi.setLineNums(tab_lineNums)
 		bi.setLines(tab_lines)
 		table.insert(blocks, bi)
-		-- next block
-		hs.reset(_lineStr)
-		hs.skipText(1)
-		hs.skipSpace();
-		bi = newBlockInfo(block_type, hs.nextWord())
-		tab_lineNums = {}
-		tab_lines = {}
+		-- check if need next block
+		if block_type then
+			hs.reset(_lineStr)
+			hs.skipText(1)
+			hs.skipSpace();
+			bi = newBlockInfo(block_type, hs.nextText())
+			tab_lineNums = {}
+			tab_lines = {}
+		end
 	end
+	-- parse case blocks
 	reader.skipLineUntil(function(_, line1)
 		if(strings.startsWith(line1, "#elseif")) then
 			func_block_type(line1, BLOCK_TYPE_ELSEIF)
 		elseif (strings.startsWith(line1, "#else")) then
 			func_block_type(line1, BLOCK_TYPE_ELSE)
 		elseif strings.startsWith(line1, "#endif") then
+			func_block_type(nil, nil)
 			return true;
 		end
 	end, func_collect)
-
+	-- handle blocks
+	for i = 1, #blocks do
+		bi = blocks[i]
+		if(DEBUG) then
+			if(bi.getType() == BLOCK_TYPE_IF) then
+				print("start handle:  if block =", bi.getExpre(), #bi.getLines())
+			elseif 	bi.getType() == BLOCK_TYPE_ELSEIF then
+				print("start handle:  elseif block =", bi.getExpre(), #bi.getLines())
+			elseif 	bi.getType() == BLOCK_TYPE_ELSE then
+				print("start handle:  else block =", bi.getExpre(), #bi.getLines())
+			end
+		end
+		-- else
+		if	bi.getType() == BLOCK_TYPE_ELSE then
+			print("find valid else: ", bi.getExpre())
+			reader.appendLines(bi.getLines());
+			return;
+		end
+		-- if/elseif
+		local num = tonumber(bi.getExpre())
+		if( num and num ~= 0 ) then
+			print("find valid number: ", bi.getExpre())
+			for j = 1, #bi.getLines() do
+				print("__line="..bi.getLines()[j])
+			end
+			reader.appendLines(bi.getLines());
+			return;
+		end
+		if(ctx.defined(bi.getExpre()) and ctx.get(bi.getExpre()) ~= 0) then
+			print("find valid expre: ", bi.getExpre())
+			reader.appendLines(bi.getLines());
+			return;
+		end
+	end
+	if(DEBUG) then
+		print("no if-elseif-else block valid.")
+	end
 end
 --[[
 handle #define and typedef
@@ -432,7 +429,7 @@ member can be: unsigned/unsigned <base_type>
 			 pointer/struct pointer/function pointer
 			 array/struct-array. may be multi level
 ]]--
-local function parseLine(ctx, line, lineNum)
+local function parseLine(reader, ctx, line, lineNum)
 	print(string.format("start parse struct line -- %d: %s", lineNum, line.toString()))
 	-- handle 'typedef struct AVCodecContext {' and '}'
 	line.skipSpace();
@@ -447,6 +444,7 @@ local function parseLine(ctx, line, lineNum)
 	if line.length() == 0 then
 		return nil
 	end
+	-- handle #define
 	if(line.startsWith("#define")) then
 		line.skipText();
 		line.skipSpace()
@@ -460,9 +458,13 @@ local function parseLine(ctx, line, lineNum)
 			ctx.define(word, tonumber(val))
 		end
 	end
-	--todo support 'if elseif else endif'
+	-- handle if-elseif-else
+	if(line.startsWith("#if")) then
+		handle_ifelse_expre(ctx, line, reader)
+		return nil;
+	end
+	-- TODO other?
 	if line.startsWith("#") then-- #define, #if
-		-- handle_ifelse_expre(ctx, )
 		return nil;
 	end
 	local info = newCtypeInfo(ctx);
@@ -577,12 +579,13 @@ function self.convertStruct(str)
 	local reader = file_reader.open(str)
 	local ctx = newContext()
 	reader.stream(function(r, lineNum, line)
-		parseLine(ctx, hstring.newHString(line), lineNum)
+		parseLine(reader, ctx, hstring.newHString(line), lineNum)
 	end)
 	print("-------- convertStruct result: ")
 	print(ctx.outStr())
 end
 
-self.convertStruct("test_res/struct1.in")
+--self.convertStruct("test_res/struct1.in")
+self.convertStruct("test_res/struct_if.in")
 
 return self;

@@ -39,12 +39,19 @@ function m.open(file_in)
             tab_lines = {};
         end
         -- `a2[t]`,`··· = a1[f]`,`···,a1[e]`.
+        -- table.move(a1, f, e, t, a2)
+        local old_size = #tab_lines
         table.move(lines, 1, #lines, #tab_lines + 1, tab_lines);
+        assert(#tab_lines == (old_size + #lines))
+        --for j = 1, #tab_lines do
+        --    print("after appendLines : "..tab_lines[j])
+        --end
     end
 
     function self.nextLine()
         -- when line is append from outside. we may lineNum not changed.
-        if tab_lines and #tab_lines > 1 then
+        -- print("----------------- next line -----------")
+        if tab_lines and #tab_lines > 0 then
             return table.remove(tab_lines, 1);
         end
         assert(file, "file is not open or had been closed.")
@@ -75,13 +82,14 @@ function m.open(file_in)
         local lineNum0;
         while(true) do
             lineNum0 = m_lineNum;
-            line = self.readLine()
+            line = self.nextLine()
             if(line) then
                 -- if true, break read . and end
                 if fun_process(self, lineNum0, line) then
                     break;
                 end
             else
+               -- print("line is invalid.")
                 break;
             end
         end
