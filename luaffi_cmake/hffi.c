@@ -1299,6 +1299,7 @@ static inline hffi_struct* hffi_new_struct_abi0(int abi,hffi_smtype** member_typ
     array_list_delete(list, NULL, NULL);
     return result;
 }
+//_hs->data can be null
 hffi_struct* hffi_struct_copy(hffi_struct* _hs){
     int count = _hs->count;
     //
