@@ -94,6 +94,7 @@
 #include "h_alloctor.h"
 #define __DYM_BUF_LEN 256
 
+
 dym_lib* dym_new_lib2(const char* dir,const char* libname){
     void* lib;
     lib = LoadLibraryA(libname);
@@ -103,19 +104,19 @@ dym_lib* dym_new_lib2(const char* dir,const char* libname){
             char buf[__DYM_BUF_LEN];
             snprintf(buf, __DYM_BUF_LEN, LIB_FORMAT_1, libname);
             lib = LoadLibraryA(buf);
+        }
     #ifdef _WIN32
-            if(!lib && dir){
-                char* ret = strstr(libname, ".dll");
-                int endWithDll = ret != NULL && strlen(ret) == 4;
-                TCHAR chCurDir[MAX_PATH] = {0};
-                GetCurrentDirectory(MAX_PATH, chCurDir);
-                SetCurrentDirectory(dir);
-                lib = LoadLibrary(endWithDll ? libname : buf);
-                SetCurrentDirectory(chCurDir);
-            }
-            if(!lib){
-                printf("load lib failed: %s, code = %d\r\n", libname, (int)GetLastError());
-            }
+        if(!lib && dir){
+            char* ret = strstr(libname, ".dll");
+            int endWithDll = ret != NULL && strlen(ret) == 4;
+            TCHAR chCurDir[MAX_PATH] = {0};
+            GetCurrentDirectory(MAX_PATH, chCurDir);
+            SetCurrentDirectory(dir);
+            lib = LoadLibrary(endWithDll ? libname : buf);
+            SetCurrentDirectory(chCurDir);
+        }
+        if(!lib){
+            printf("load lib failed: %s, code = %d\r\n", libname, (int)GetLastError());
         }
     #endif
     #endif
