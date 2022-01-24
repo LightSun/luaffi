@@ -390,6 +390,50 @@ static int xffi_harray_eq(lua_State* L){
     lua_pushboolean(L, ok);
     return 1;
 }
+static int xffi_harrays_new(lua_State* L){
+    // (type, {3, 2, 5})
+    // (struct, {3, 2, 5})
+    if(lua_gettop(L) < 2){
+        return luaL_error(L, "create harrays need like ([base_type/struct], {3, 2, 5}).");
+    }
+    switch (lua_type(L, -2)) {
+    case LUA_TNUMBER:{
+        int hffi_t = luaL_checkinteger(L, -2);
+        luaL_checktype(L, -1, LUA_TTABLE);
+        int len = lua_rawlen(L, -1);
+        int dims[len];
+        for(int i = 0 ; i < len; i++){
+            lua_rawgeti(L, -1, i + 1);
+            dims[i] = luaL_checkinteger(L, -1);
+            lua_pop(L, 1);
+        }
+        harray* arr = harray_new_multi(hffi_t, dims, len);
+        return push_ptr_harray(L, arr);
+    }break;
+    case LUA_TUSERDATA:{
+        if(luaL_testudata(L, -1, __STR(hffi_struct))){
+            luaL_checktype(L, -1, LUA_TTABLE);
+            int len = lua_rawlen(L, -1);
+            int dims[len];
+            for(int i = 0 ; i < len; i++){
+                lua_rawgeti(L, -1, i + 1);
+                dims[i] = luaL_checkinteger(L, -1);
+                lua_pop(L, 1);
+            }
+            struct hffi_struct* temp = hffi_struct_copy(get_ptr_hffi_struct(L, -2));
+            //not alloc data for every struct. just alloc the total.
+            temp->data = NULL;
+            harray* arr = harray_new_multi_struct(temp, dims, len);
+            hffi_delete_struct(temp);
+            return push_ptr_harray(L, arr);
+        }else{
+            return luaL_error(L, "wrong user data of new harrays, only support hffi_struct");
+        }
+    }break;
+    default:
+        return luaL_error(L, "wrong type of new harrays. type = %d", lua_type(L, -2));
+    }
+}
 
 static int xffi_harray_new(lua_State* L){
     if(lua_gettop(L) < 1){
@@ -1764,6 +1808,7 @@ LUAMOD_API void register_ffi(lua_State *L){
     setfield_function(L, "value", xffi_value_new);
     setfield_function(L, "valuePtr", xffi_value_ptr_new);
     setfield_function(L, "array", xffi_harray_new);
+    setfield_function(L, "arrays", xffi_harrays_new);
     setfield_function(L, "struct", xffi_struct_new);
     setfield_function(L, "smtype", xffi_smtype_new);
     setfield_function(L, "closure", xffi_new_closure);

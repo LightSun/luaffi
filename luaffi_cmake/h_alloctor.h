@@ -12,7 +12,7 @@ void* h_alloctor_calloc(int new_size);
 void h_alloctor_free(void* data);
 
 #define MALLOC h_alloctor_alloc
-#define CMALLOC h_alloctor_calloc
+#define CALLOCH h_alloctor_calloc
 #define FREE h_alloctor_free
 #define REALLOC h_alloctor_realloc
 

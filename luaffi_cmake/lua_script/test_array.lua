@@ -33,6 +33,9 @@ assert(arr[0]==100)
 assert(arr[1]==100)
 assert(arr[2]==100)
 
+arr = hffi.arrays(byte,{3, 5, 2});
+print("hffi.arrays: arr")
+print(arr)
 
 print("gc: ",collectgarbage("count"))
 

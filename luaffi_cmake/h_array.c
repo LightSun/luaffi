@@ -143,13 +143,9 @@ static void setChildArray_struct(harray* parent,struct hffi_struct* stru, int* a
             harray_delete(harr_tmp);
         }
     }else{
-        //copy a temp struct without data.
-        struct hffi_struct* temp = hffi_struct_copy(stru);
-        //void* data = temp->data;
-        temp->data = NULL;
         struct hffi_struct* stru2;
         for(int j = 0 ; j < c ; j ++){
-            stru2 = hffi_struct_copy(temp);
+            stru2 = hffi_struct_copy(stru);
             //mark data never free.
             stru2->should_free_data = 0;
             stru2->data = parent->data + offset;
@@ -176,7 +172,7 @@ harray* harray_new_multi(sint8 hffi_t, int* arr_count, int size){
     arr->ele_count = arr_count[0];
     arr->ref = 1;
     if(size > 1){
-        arr->ele_list = MALLOC(sizeof (void*) * arr->ele_count);
+        arr->ele_list = CALLOCH(sizeof (void*) * arr->ele_count);
     }else{
         arr->ele_list = NULL;
     }
@@ -198,7 +194,7 @@ harray* harray_new_multi_struct(struct hffi_struct* stru, int* arr_count, int si
     arr->ele_count = arr_count[0];
     arr->ref = 1;
     if(size > 1){
-        arr->ele_list = MALLOC(sizeof (void*) * arr->ele_count);
+        arr->ele_list = CALLOCH(sizeof (void*) * arr->ele_count);
     }else{
         arr->ele_list = NULL;
     }
@@ -323,7 +319,7 @@ harray* harray_new_from_data(sint8 hffi_t, void* data, int data_size, int ele_co
     case HFFI_TYPE_HARRAY_PTR:
     case HFFI_TYPE_HARRAY:{
         arr->ele_list = MALLOC(sizeof (void*) * ele_count);
-        memset(arr->ele_list, 0 , sizeof (void*) * ele_count);
+        memset(arr->ele_list, 0, sizeof (void*) * ele_count);
     }break;
     default:
         arr->ele_list = NULL;
