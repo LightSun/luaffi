@@ -102,21 +102,21 @@ harray* harray_new(sint8 hffi_t, int count){
 }
 //arr_count = [3,4,5]  means array. a[3][4][5]
 static void setChildArray(harray* parent,sint8 hffi_t, int* arr_count, int size, int cur_index){
-    int c, hasChild, ele_count;
+    int c, ele_count;
+    int isLast = cur_index == size - 2;
 
     int offset = 0;
     harray* harr_tmp;
     c = arr_count[cur_index];
-    hasChild = cur_index < size - 1;
     //a[3][4][5]
-    ele_count = hasChild ? arr_count[cur_index + 1] : c;
+    ele_count = arr_count[cur_index + 1];
     for(int j = 0 ; j < c ; j ++){
-        harr_tmp = harray_new_from_data(hasChild ? HFFI_TYPE_HARRAY : hffi_t,
+        harr_tmp = harray_new_from_data(isLast ? hffi_t : HFFI_TYPE_HARRAY,
                              parent->data + offset, parent->data_size / c, ele_count, 0);
         offset += parent->data_size / c;
         harray_seti2(parent, j, harr_tmp);
-        if(hasChild){
-            setChildArray(harr_tmp, hffi_t, arr_count + 1, ele_count, cur_index + 1);
+        if(!isLast){
+            setChildArray(harr_tmp, hffi_t, arr_count, size, cur_index + 1);
         }
         //-- ref
         harray_delete(harr_tmp);
@@ -124,21 +124,21 @@ static void setChildArray(harray* parent,sint8 hffi_t, int* arr_count, int size,
 }
 //arr_count = [3,4,5]  means array. a[3][4][5]
 static void setChildArray_struct(harray* parent,struct hffi_struct* stru, int* arr_count, int size, int cur_index){
-    int c, hasChild, ele_count;
+    int c, ele_count;
+    const int isLast = cur_index == size - 2;
 
     int offset = 0;
     harray* harr_tmp;
     c = arr_count[cur_index];
-    hasChild = cur_index < size - 1;
     //a[3][4][5]
-    ele_count = hasChild ? arr_count[cur_index + 1] : c;
-    if(hasChild){
+    ele_count = arr_count[cur_index + 1];
+    if(!isLast){
         for(int j = 0 ; j < c ; j ++){
             harr_tmp = harray_new_from_data(HFFI_TYPE_HARRAY,
                                  parent->data + offset, parent->data_size / c, ele_count, 0);
             offset += parent->data_size / c;
             harray_seti2(parent, j, harr_tmp);
-            setChildArray_struct(harr_tmp, stru, arr_count + 1, ele_count, cur_index + 1);
+            setChildArray_struct(harr_tmp, stru, arr_count, size, cur_index + 1);
             //-- ref
             harray_delete(harr_tmp);
         }
@@ -172,12 +172,15 @@ harray* harray_new_multi(sint8 hffi_t, int* arr_count, int size){
     arr->ele_count = arr_count[0];
     arr->ref = 1;
     if(size > 1){
-        arr->ele_list = CALLOCH(sizeof (void*) * arr->ele_count);
+        arr->ele_list = CALLOC(sizeof (void*) * arr->ele_count);
+        assert(arr->ele_list);
     }else{
         arr->ele_list = NULL;
     }
     //set sub harray.
-    setChildArray(arr, hffi_t, arr_count, size, 0);
+    if(size > 1){
+        setChildArray(arr, hffi_t, arr_count, size, 0);
+    }
     return arr;
 }
 harray* harray_new_multi_struct(struct hffi_struct* stru, int* arr_count, int size){
@@ -194,13 +197,14 @@ harray* harray_new_multi_struct(struct hffi_struct* stru, int* arr_count, int si
     arr->ele_count = arr_count[0];
     arr->ref = 1;
     if(size > 1){
-        arr->ele_list = CALLOCH(sizeof (void*) * arr->ele_count);
+        arr->ele_list = CALLOC(sizeof (void*) * arr->ele_count);
     }else{
         arr->ele_list = NULL;
     }
-    //create sub harray.
-    //harray_new_from_data
-    setChildArray_struct(arr, stru, arr_count, size, 0);
+    //set sub harray.
+    if(size > 1){
+        setChildArray_struct(arr, stru, arr_count, size, 0);
+    }
     return arr;
 }
 //-------------------------------------------------
@@ -476,6 +480,10 @@ int harray_geti(harray* arr, int index, union harray_ele* ptr){
                 void* data_ptr = arr->data + index * (arr->data_size / arr->ele_count);
                 memcpy(((harray*)ptr->_extra)->data, data_ptr, target_size);
                 return HFFI_STATE_OK;
+            }else{
+                //if not set. we create a new array but data from parent ?.
+//              harr_tmp = harray_new_from_data(isLast ? hffi_t : HFFI_TYPE_HARRAY,
+//                                     parent->data + offset, parent->data_size / c, ele_count, 0);
             }
         }break;
 
