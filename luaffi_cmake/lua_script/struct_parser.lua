@@ -202,7 +202,7 @@ local function newCtypeInfo(ctx, c)
 	local _ctx = ctx;
 	local _flags = 0;
 	local _name;
-	local _arr_ele_count = 0;
+	local tab_array_count = {};
 	local _pointerLevel = 0;
 	-- self.baseTypeStr. pointerLevel, array_ele_count
 	function self.setBaseTypeStr(t)
@@ -221,7 +221,7 @@ local function newCtypeInfo(ctx, c)
 			self.baseTypeStr = "int"; -- for c . enum default int.
 		end
 		-- check array
-		if(_arr_ele_count == 0) then
+		if(#tab_array_count == 0) then
 			if( self.hasFlags(INFO_FLAG_STRUCT) == true) then
 				if _ctx.hasStruct(t) == false then
 					error(string.format("you must parse struct '%s' before %s.", t, _ctx.getCurStructName()))
@@ -235,6 +235,17 @@ local function newCtypeInfo(ctx, c)
 				_ctx.appendLine(string.format("%s, %s;", self.baseTypeStr, _name))
 			end
 		else
+			-- build array desc
+			-- like: local arr_frame_data = hffi.arrays(int, {3, 2, 5})
+			local desc = "{";
+			local len = #tab_array_count;
+			for i = 1, len do
+				desc = desc .. tostring(tab_array_count[i]);
+				if(i ~= len) then
+					desc = desc .. ", ";
+				end
+			end
+			desc = desc .. "}";
 			--todo currently only support one-level-array. support 2-leve/3level ?
 			if( self.hasFlags(INFO_FLAG_STRUCT) == true) then
 				if _ctx.hasStruct(t) == false then
@@ -242,19 +253,12 @@ local function newCtypeInfo(ctx, c)
 				else
 					-- local arr_frame_data = hffi.array(pointer, AV_NUM_DATA_POINTERS)
 					-- local arr_frame_data = hffi.array({}, {})
-					local desc = "";
-					for i = 1, _arr_ele_count do
-						desc = desc.._ctx.getStructObjName(t)..".copy()"
-						if( i ~= _arr_ele_count) then
-							desc = desc..", "
-						end
-					end
-					_ctx.appendLine(string.format("local %s = hffi.array({ %s });",
-							self.getArrayDefName(), desc), true);
+					_ctx.appendLine(string.format("local %s = hffi.arrays(%s, %s);",
+							self.getArrayDefName(), _ctx.getStructObjName(t)..".copy()", desc), true);
 				end
 			else
-				_ctx.appendLine(string.format("local %s = hffi.array(%s, %d);",
-						self.getArrayDefName(), self.baseTypeStr, _arr_ele_count), true);
+				_ctx.appendLine(string.format("local %s = hffi.arrays(%s, %s);",
+						self.getArrayDefName(), self.baseTypeStr, desc), true);
 			end
 			if(_pointerLevel > 0) then
 				_ctx.appendLine(string.format("%s, %s;", "pointer", _name))
@@ -263,17 +267,21 @@ local function newCtypeInfo(ctx, c)
 			end
 		end
 	end
-
-	function self.setArrayElementCount(count)
-		_arr_ele_count = count;
+    function self.appendArrayElementCount(count)
+		table.insert(tab_array_count, count);
 	end
-
 	function self.setPointerLevel(level)
 		_pointerLevel = level;
 	end
 
 	function self.getArrayDefName()
-		return "_"..self.baseTypeStr.. "_"..tostring(_arr_ele_count)
+		local desc = "";
+		local len = #tab_array_count;
+		for i = 1, len do
+			desc = desc.."_"..tostring(tab_array_count[i]);
+		end
+		desc = desc .. "";
+		return "_"..self.baseTypeStr..desc
 	end
 
 	function self.addFlags(flags)
@@ -564,8 +572,15 @@ local function parseLine(reader, ctx, line, lineNum)
 	    info.setName(name)
 
 		print(string.format("after name left: '%s'",line.toString()))
-	    local array_ele_count = line.nextArrayElementCount(ctx); -- [i]
-		info.setArrayElementCount(array_ele_count);
+		local array_ele_count;
+		while(true) do
+			array_ele_count = line.nextArrayElementCount(ctx); -- [i]
+			if(array_ele_count > 0) then
+				info.appendArrayElementCount(array_ele_count)
+			else
+				break;
+			end
+		end
 	end
 	info.processType();
 	return true
@@ -581,7 +596,7 @@ function self.convertStruct(str)
 	reader.stream(function(r, lineNum, line)
 		parseLine(reader, ctx, hstring.newHString(line), lineNum)
 	end)
-	print("-------- convertStruct result: ")
+	print("-------- convertStruct result ---------- ")
 	print(ctx.outStr())
 end
 

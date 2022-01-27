@@ -245,6 +245,7 @@ function m.newHString(str)
 				error("nextArrayElementCount>>> you must define the int value to the context for '"..numStr.."'")
 			end
 		end
+		-- skip count with '[' and ']'
 		pos = pos + 2 + count
 		return num;
 	end

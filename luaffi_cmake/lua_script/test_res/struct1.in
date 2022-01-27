@@ -23,4 +23,7 @@ struct A {
     struct S* A3;
     struct S _s2;
     struct S _s3[COUNT];
+
+     struct S _s_arr[3][2][5];
+     int _int_arr[3][2][5];
 };
