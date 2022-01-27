@@ -96,14 +96,28 @@ tab_types["uint8_t"] = uint8
 ]]--
 
 local DEBUG = 1;
-
+local function getWorkDir()
+	local info = debug.getinfo(1, "S") -- 第二个参数 "S" 表示仅返回 source,short_src等字段， 其他还可以 "n", "f", "I", "L"等 返回不同的字段信息
+	--for k,v in pairs(info) do
+	--	print(k, ":", v)
+	--end
+	local path = info.source
+	path = string.sub(path, 2, -1) -- 去掉开头的"@"
+	path = string.match(path, "^.*/") -- 捕获最后一个 "/" 之前的部分 就是我们最终要的目录部分
+	if(DEBUG) then
+		print("work_dir =", path)
+	end
+	return path;
+end
 local function newContext(c)
 	local self = c or {};
 	local str = "";
-	local tab_structs = {} -- struct names
-	local cur_struct_name; -- current struct name
-	local tab_strs = {}; -- the all strs of struct-defines.
+	local tab_structs = {}	 -- struct names
+	local cur_struct_name;	 -- current struct name
+	local tab_strs = {};	 -- the all strs of struct-defines.
 	local tab_defines;
+	local _work_dir = getWorkDir(); -- the work dir of current parser.
+	local _cur_file; 				  -- the current file to parse
 
 	function self.startStruct(name)
 		--print("============ add struct: ", name)
@@ -187,6 +201,43 @@ local function newContext(c)
 			out_str = out_str..tab_strs[i]
 		end
 		return out_str;
+	end
+	function self.printDefines()
+		if not tab_defines then
+			return;
+		end
+		print("------- Defines start ------")
+		for key, value in pairs(tab_defines) do
+			print(key, tostring(value))
+		end
+		print("------- Defines end ------")
+	end
+	------------------------------------
+	function self.setCurrentFile(file_)
+		_cur_file = file_;
+	end
+	-- return the file path which can be used for parser
+	function self.filePath(name)
+		if(strings.isAbsolutePath(name)) then
+			return name;
+		end
+		local dir;
+		if(strings.isAbsolutePath(_cur_file)) then
+			dir = string.match(_cur_file, "^.*/");
+		else
+			-- '_cur_file' is relative file
+			if(string.find(_cur_file, "/")) then
+				dir = _work_dir..string.match(_cur_file, "^.*/");
+			else
+				dir = _work_dir;
+			end
+		end
+		-- the count to reverse
+		local count = strings.count(name, "../")
+		for i = 1, count do
+			dir = string.match(dir, "^.*/");
+		end
+		return dir..name;
 	end
 	return self;
 end
@@ -452,6 +503,20 @@ local function parseLine(reader, ctx, line, lineNum)
 	if line.length() == 0 then
 		return nil
 	end
+	-- handle "#include"
+	if(line.startsWith("#include")) then
+		line.skipText();
+		line.skipSpace()
+		-- get file name
+		local filename = ctx.filePath(line.nextQuoteText());
+		print("filename: ", filename)
+		local reader0 = file_reader.open(filename)
+		local include_lines = reader0.readLines()
+		reader0.close()
+		reader.appendLines(include_lines)
+		return nil;
+	end
+
 	-- handle #define
 	if(line.startsWith("#define")) then
 		line.skipText();
@@ -589,18 +654,23 @@ end
 local self = {};
 
 --str: the struct desc from C.
-function self.convertStruct(str)
+function self.convertStruct(str, _ctx)
 
+	local ctx = _ctx or newContext()
+	ctx.setCurrentFile(str);
+	--ctx.filePath("abc.in")
 	local reader = file_reader.open(str)
-	local ctx = newContext()
 	reader.stream(function(r, lineNum, line)
 		parseLine(reader, ctx, hstring.newHString(line), lineNum)
 	end)
 	print("-------- convertStruct result ---------- ")
+	ctx.printDefines();
 	print(ctx.outStr())
 end
 
 --self.convertStruct("test_res/struct1.in")
-self.convertStruct("test_res/struct_if.in")
+--self.convertStruct("test_res/struct_if.in")
+
+self.convertStruct("test_res/ffmpeg.in")
 
 return self;

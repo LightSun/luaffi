@@ -249,7 +249,27 @@ function m.newHString(str)
 		pos = pos + 2 + count
 		return num;
 	end
-	
+	-- "abcd" -> abcd
+	function self.nextQuoteText()
+		if strings.charAt(_str, pos) ~= string.byte("\"") then
+			return nil;
+		end
+		local code_end = string.byte("\"");
+		local count = 0;
+		for i = pos + 1, #_str do
+			if strings.charAt(_str, i) == code_end then
+				break;
+			end
+			count = count + 1 ;
+		end
+		if(count == 0) then
+			return 0;
+		end
+		local txt = string.sub(_str, pos + 1, pos + count)
+		-- skip count with '\"' and '\"'
+		pos = pos + 2 + count
+		return txt;
+	end
 	--------------------------
 	
 	function self.save()

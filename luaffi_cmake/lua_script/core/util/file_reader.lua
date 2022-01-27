@@ -2,10 +2,13 @@
 local m = {};
 
 function m.open(file_in)
+    assert(file_in, "file must not be empty")
     local self = {};
     local file;
     local m_lineNum = 1;
     local tab_lines;
+   -- local tab_insert_files;
+   -- local tab_insert_lines; -- <k,v> key = file, value = tab_lines
 
     -- func_predicate: return true. means stop skip.
     function self.skipLineUntil(func_predicate, func_collect)
@@ -14,7 +17,7 @@ function m.open(file_in)
         while(true) do
             lineNum = m_lineNum;
             line = self.nextLine()
-            if func_predicate(lineNum, line) == true then
+            if not line or func_predicate(lineNum, line) == true then
                 break;
             else
                 if func_collect then
@@ -22,6 +25,19 @@ function m.open(file_in)
                 end
             end
         end
+    end
+
+    function self.readLines()
+        local lines = {}
+        local line;
+        while(true) do
+            line = self.nextLine();
+            if(not line) then
+                break;
+            end
+            table.insert(lines, line)
+        end
+        return lines;
     end
 
     function self.appendLine(line)

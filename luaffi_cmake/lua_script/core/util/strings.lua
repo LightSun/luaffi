@@ -22,7 +22,6 @@ function m.count(str, substr, from, to)
     if to == nil or to > string.len(str) then
         to = string.len(str)
     end
-    local str_tmp = string.sub(str, from ,to)
     local _, n = string.gsub(str, substr, '')
     return n
 end
@@ -31,7 +30,7 @@ function m.startsWith(str, substr)
         return nil, "the string or the sub-stirng parameter is nil"
     end
     if string.find(str, substr) ~= 1 then
-        return false
+        return nil
     else
         return true
     end
@@ -44,7 +43,7 @@ function m.endsWith(str, substr)
     local str_tmp = string.reverse(str)
     local substr_tmp = string.reverse(substr)
     if string.find(str_tmp, substr_tmp) ~= 1 then
-        return false
+        return nil
     else
         return true
     end
@@ -64,6 +63,18 @@ end
     end
     insert(res, sub(str,start))
     return res
+end
+
+function m.isAbsolutePath(path)
+    -- unix absolute file path
+    if(m.startsWith(path, "/")) then
+        return true;
+    end
+    -- windows disk
+    if(string.sub(path, 2, 2) == ":")then
+        return true;
+    end
+    return nil;
 end
 
 function m.bytes2Str(bytes)
