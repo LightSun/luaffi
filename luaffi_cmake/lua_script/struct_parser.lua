@@ -273,17 +273,21 @@ local function newCtypeInfo(ctx, c)
 		end
 		-- check array
 		if(#tab_array_count == 0) then
-			if( self.hasFlags(INFO_FLAG_STRUCT) == true) then
+			if( self.hasFlags(INFO_FLAG_STRUCT) == true )then
 				if _ctx.hasStruct(t) == false then
 					error(string.format("you must parse struct '%s' before %s.", t, _ctx.getCurStructName()))
 				else
 					self.baseTypeStr = _ctx.getStructObjName(t)..".copy()";
 				end
+			elseif ctx.hasStruct(t) then
+				self.baseTypeStr = _ctx.getStructObjName(t)..".copy()";
 			end
 			if(_pointerLevel > 0) then
-				_ctx.appendLine(string.format("%s, %s;", "pointer", _name))
+				_ctx.appendLine(string.format("%s, \"%s\";", "pointer", _name))
 			else
-				_ctx.appendLine(string.format("%s, %s;", self.baseTypeStr, _name))
+				local alias = _ctx.get(self.baseTypeStr);
+				local name = alias or self.baseTypeStr;
+				_ctx.appendLine(string.format("%s, \"%s\";", name, _name))
 			end
 		else
 			-- build array desc
@@ -312,9 +316,9 @@ local function newCtypeInfo(ctx, c)
 						self.getArrayDefName(), self.baseTypeStr, desc), true);
 			end
 			if(_pointerLevel > 0) then
-				_ctx.appendLine(string.format("%s, %s;", "pointer", _name))
+				_ctx.appendLine(string.format("%s, \"%s\";", "pointer", _name))
 			else
-				_ctx.appendLine(string.format("%s, %s;", self.getArrayDefName(), _name))
+				_ctx.appendLine(string.format("%s, \"%s\";", self.getArrayDefName(), _name))
 			end
 		end
 	end
@@ -370,6 +374,7 @@ local BLOCK_TYPE_ELSEIF = 2
 local BLOCK_TYPE_ELSE   = 3
 -- local BLOCK_TYPE_ENDIF  = 4
 local function newBlockInfo(_type, expre)
+	print(string.format(">> newBlockInfo: type = %d, expre = %s", _type, expre))
 	local self = {}
 	local tab_lineNums = {}
 	local tab_lines = {}
@@ -403,7 +408,9 @@ end
 #endif
 ]]
 local function handle_ifelse_expre(ctx, hs_line, reader)
+	print(" handle_ifelse_expre >> ", hs_line.rawString())
 	hs_line.skipText() -- skip '#if'
+	hs_line.skipSpace();
 	local hs = hstring.newHString("---") -- just holder
 	local name = hs_line.nextText()
 	local blocks = {}
@@ -446,6 +453,10 @@ local function handle_ifelse_expre(ctx, hs_line, reader)
 	-- handle blocks
 	for i = 1, #blocks do
 		bi = blocks[i]
+		-- if not exist
+		if(not bi.getExpre())then
+
+		end
 		if(DEBUG) then
 			if(bi.getType() == BLOCK_TYPE_IF) then
 				print("start handle:  if block =", bi.getExpre(), #bi.getLines())
@@ -528,7 +539,7 @@ local function parseLine(reader, ctx, line, lineNum)
 			return nil
 		else
 			-- currently only support number
-			ctx.define(word, tonumber(val))
+			ctx.define(word, tonumber(val) or val)
 		end
 	end
 	-- handle if-elseif-else

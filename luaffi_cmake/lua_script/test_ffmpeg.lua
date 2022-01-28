@@ -103,7 +103,7 @@ frame.as(stru_frame)
 
 
 local function pgm_save(buf, linesize, xsize, ysize, filename)
-	local f = c_runtime.fopen{ret = hffi.valuePtr(void); filename, "wb"}	
+	local f = c_runtime.fopen {ret = hffi.valuePtr(void); filename, "wb"}
 	c_runtime.fprintf {ret = int; var_count = 3; f, "P5\n%d %d\n%d\n", xsize, ysize, hffi.value(int, 255)}
 	local val_c = hffi.value(size_t, 0);
 	local val_1 = hffi.value(size_t, 1);

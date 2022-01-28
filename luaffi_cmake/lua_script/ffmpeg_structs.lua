@@ -223,6 +223,7 @@ local arr_error = hffi.array(int, AV_NUM_DATA_POINTERS)
 
 local arr_buf = hffi.array(pointer, AV_NUM_DATA_POINTERS)
 
+-- AvFrame
 local stru_avframe = hffi.struct{
 	no_data = true;
 	free_data = false;
@@ -342,9 +343,98 @@ local stru_pkt = hffi.struct{
 	sint64, "convergence_duration";
 }
 
+-- AVFrameContext
+local _AVIOInterruptCB = hffi.struct({
+	no_data = true ;
+	free_data = false ;
+	pointer, "callback";
+	pointer, "opaque";
+})
+local _char_1024 = hffi.arrays(char, {1024});
+local _AVFormatContext = hffi.struct({
+	no_data = true ;
+	free_data = false ;
+	pointer, "av_class";
+	pointer, "iformat";
+	pointer, "oformat";
+	pointer, "priv_data";
+	pointer, "pb";
+	int, "ctx_flags";
+	uint32, "nb_streams";
+	pointer, "streams";
+	_char_1024, "filename";
+	pointer, "url";
+	int64_t, "start_time";
+	int64_t, "duration";
+	int64_t, "bit_rate";
+	uint32, "packet_size";
+	int, "max_delay";
+	int, "flags";
+	int64_t, "probesize";
+	int64_t, "max_analyze_duration";
+	pointer, "key";
+	int, "keylen";
+	uint32, "nb_programs";
+	pointer, "programs";
+	int, "video_codec_id";
+	int, "audio_codec_id";
+	int, "subtitle_codec_id";
+	uint32, "max_index_size";
+	uint32, "max_picture_buffer";
+	uint32, "nb_chapters";
+	pointer, "chapters";
+	pointer, "metadata";
+	int64_t, "start_time_realtime";
+	int, "fps_probe_size";
+	int, "error_recognition";
+	_AVIOInterruptCB.copy(), "interrupt_callback";
+	int, "debug";
+	int64_t, "max_interleave_delta";
+	int, "strict_std_compliance";
+	int, "event_flags";
+	int, "max_ts_probe";
+	int, "avoid_negative_ts";
+	int, "ts_id";
+	int, "audio_preload";
+	int, "max_chunk_duration";
+	int, "max_chunk_size";
+	int, "use_wallclock_as_timestamps";
+	int, "avio_flags";
+	int, "duration_estimation_method";
+	int64_t, "skip_initial_bytes";
+	uint32, "correct_ts_overflow";
+	int, "seek2any";
+	int, "flush_packets";
+	int, "probe_score";
+	int, "format_probesize";
+	pointer, "codec_whitelist";
+	pointer, "format_whitelist";
+	pointer, "internal";
+	int, "io_repositioned";
+	pointer, "video_codec";
+	pointer, "audio_codec";
+	pointer, "subtitle_codec";
+	pointer, "data_codec";
+	int, "metadata_header_padding";
+	pointer, "opaque";
+	pointer, "control_message_cb";
+	int64_t, "output_ts_offset";
+	pointer, "dump_separator";
+	int, "data_codec_id";
+	pointer, "open_cb";
+	pointer, "protocol_whitelist";
+	pointer, "io_open";
+	pointer, "io_close";
+	pointer, "protocol_blacklist";
+	int, "max_streams";
+	int, "skip_estimate_duration_from_pts";
+	int, "max_probe_packets";
+})
+
 return {
 avcontext = stru_context,
 avframe = stru_avframe,
 avcodec = stru_codec,
 avpacket = stru_pkt,
+avframeCtx = _AVFormatContext,
 }

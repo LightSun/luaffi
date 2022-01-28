@@ -306,6 +306,10 @@ function m.newHString(str)
 	function self.toString()
 		return string.sub(_str, pos)
 	end
+
+	function self.rawString()
+		return _str;
+	end
 	
 	return self;
 end

@@ -597,8 +597,7 @@ typedef struct AVFormatContext {
      * passed to this callback may be different from the one facing the caller.
      * It will, however, have the same 'opaque' field.
      */
-    int (*io_open)(struct AVFormatContext *s, AVIOContext **pb, const char *url,
-                   int flags, AVDictionary **options);
+    int (*io_open)(struct AVFormatContext *s, AVIOContext **pb, const char *url, int flags, AVDictionary **options);
 
     /**
      * A callback for closing the streams opened with AVFormatContext.io_open().
