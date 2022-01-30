@@ -37,10 +37,11 @@ harray* harray_new(sint8 hffi_t, int count);
 harray* harray_new_nodata(sint8 hffi_t, int count);
 
 /**
-new multi level array.
+new multi level array. like 'char arr[2][3][5]'
 */
 harray* harray_new_multi(sint8 hffi_t, int* arr_count, int size);
 harray* harray_new_multi_struct(struct hffi_struct* stru, int* arr_count, int size);
+harray* harray_new_multi_struct_ptr(struct hffi_struct* stru, int* arr_count, int size);
 /**
  * @brief harray_new_array: create an array. element is array-ptr.
  * @param count

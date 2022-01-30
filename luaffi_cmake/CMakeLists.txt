@@ -49,7 +49,7 @@ add_subdirectory(lua-5.3.6)
 
 include_directories(lua-5.3.6/src)
 
-add_library(ffi2 STATIC ffi2.h ffi.c ffi_ext.c)
+#add_library(ffi2 STATIC ffi2.h ffi.c ffi_ext.c)
 
 # USE_C11_ATOMICS,USE_MSC_ATOMICS,USE_GCC_ATOMICS,USE_PTHREAD_ATOMICS
 
@@ -101,7 +101,7 @@ add_executable(luaffi_app
     ${SRC_HFFI}
     )
 
-target_link_libraries(ffi2 lua ${ffi_libs})
+#target_link_libraries(ffi2 lua ${ffi_libs})
 target_link_libraries(luaffi_app ffi2 lua ${Sys_lib})
 if(gTest_enabled)
     target_link_libraries(luaffi_app ${gTest_libs})

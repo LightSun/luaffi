@@ -40,15 +40,38 @@ if(result.get() < 0) then
     os.exit(1);
 end
 local videoindex = -1;
-pFormatCtx.as(ffmpeg_structs.avframeCtx);
+local avframeCtx = ffmpeg_structs.avframeCtx;
+pFormatCtx.as(avframeCtx);
 --[[
 for(i=0; i<pFormatCtx->nb_streams; i++)
 if(pFormatCtx->streams[i]->codec->codec_type==AVMEDIA_TYPE_VIDEO){
 videoindex=i;
 break;
 }]]
-local nb_streams = ffmpeg_structs.avframeCtx.nb_streams;
+local nb_streams = avframeCtx.nb_streams;
+local _avstream = ffmpeg_structs.avstream;
 --     struct AVStream** streams;
+local strams = avframeCtx.streams.as(hffi.arrays(_avstream, {nb_streams}, true));
+local temp_avcodec_ctx = ffmpeg_structs.avcontext.copy();
+local AVMEDIA_TYPE_VIDEO = 0
 for i = 1, nb_streams do
-
+    local codec_type = strams[i-1].codec.as(temp_avcodec_ctx).codec_type
+    if(codec_type == AVMEDIA_TYPE_VIDEO) then
+        videoindex = i - 1;
+        break;
+    end
 end
+
+if(videoindex == -1) then
+    print("Couldn't find a video stream.");
+    os.exit(1);
+end
+
+--[[
+pCodecCtx=pFormatCtx->streams[videoindex]->codec;
+pCodec=avcodec_find_decoder(pCodecCtx->codec_id);
+if(pCodec==NULL){
+    LOGE("Couldn't find Codec.\n");
+return -1;
+}]]
+local pCodecCtx = strams[videoindex].as(temp_avcodec_ctx);

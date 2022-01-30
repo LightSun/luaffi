@@ -682,6 +682,7 @@ end
 --self.convertStruct("test_res/struct1.in")
 --self.convertStruct("test_res/struct_if.in")
 
-self.convertStruct("test_res/ffmpeg.in")
+--self.convertStruct("test_res/ffmpeg.in")
+self.convertStruct("test_res/ffmpeg_avstream.in")
 
 return self;

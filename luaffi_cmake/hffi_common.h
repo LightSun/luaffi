@@ -220,6 +220,7 @@ void hffi_delete_struct(struct hffi_struct* c);
 void* hffi_struct_get_data(struct hffi_struct* c);
 int hffi_struct_get_data_size(struct hffi_struct* c);
 
+void hffi_struct_free_data(struct hffi_struct* c);
 /**
  * @brief hffi_struct_ref: add the struct reference count
  * @param c: the struct

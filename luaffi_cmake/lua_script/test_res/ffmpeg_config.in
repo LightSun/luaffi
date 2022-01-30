@@ -1,8 +1,24 @@
 #define FF_API_OLD_OPEN_CALLBACKS 1
 #define FF_API_FORMAT_FILENAME 1
 #define av_format_control_message pointer
+#define FF_API_LAVF_AVCTX 1
+#define FF_API_LAVF_FFSERVER 1
+
+#define LIBAVFORMAT_VERSION_MAJOR 1
 
 typedef struct AVIOInterruptCB {
     int (*callback)(void*);
     void *opaque;
 } AVIOInterruptCB;
+
+typedef struct AVRational{
+    int num; ///< Numerator
+    int den; ///< Denominator
+} AVRational;
+
+typedef struct AVProbeData {
+    const char *filename;
+    unsigned char *buf; /**< Buffer must have AVPROBE_PADDING_SIZE of extra allocated bytes filled with zero. */
+    int buf_size;       /**< Size of buf except extra allocated bytes */
+    const char *mime_type; /**< mime_type, when known. */
+} AVProbeData;

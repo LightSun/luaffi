@@ -1512,10 +1512,7 @@ void hffi_delete_struct(hffi_struct* val){
         if(val->children != NULL){
             array_list_delete2(val->children, __release_struct_item);
         }
-        // MALLOC data by self
-        if(val->parent_pos < 0 && val->data && val->should_free_data){
-            FREE(val->data);
-        }
+        hffi_struct_free_data(val);
         FREE(val->hffi_types);
         HFFI_FREE_PARENT(val)
         //self
@@ -1527,6 +1524,13 @@ int hffi_struct_is_pointer(hffi_struct* hs, int index){
 }
 void hffi_struct_ref(hffi_struct* c, int ref_count){
     atomic_add(&c->ref, ref_count);
+}
+void hffi_struct_free_data(struct hffi_struct* c){
+    // MALLOC data by self. should free
+    if(c->parent_pos < 0 && c->data && c->should_free_data){
+        FREE(c->data);
+    }
+    c->data = NULL;
 }
 void* hffi_struct_get_data(struct hffi_struct* c){
     return c->data;

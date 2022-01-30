@@ -392,18 +392,18 @@ static int xffi_harray_eq(lua_State* L){
 }
 static int xffi_harrays_new(lua_State* L){
     // (type, {3, 2, 5})
-    // (struct, {3, 2, 5})
+    // (struct, {3, 2, 5},[true]) multi-level pointer array. true means as struct-ptr.
     if(lua_gettop(L) < 2){
         return luaL_error(L, "create harrays need like ([base_type/struct], {3, 2, 5}).");
     }
-    switch (lua_type(L, -2)) {
+    switch (lua_type(L, 1)) {
     case LUA_TNUMBER:{
-        int hffi_t = luaL_checkinteger(L, -2);
-        luaL_checktype(L, -1, LUA_TTABLE);
-        int len = lua_rawlen(L, -1);
+        int hffi_t = luaL_checkinteger(L, 1);
+        luaL_checktype(L, 2, LUA_TTABLE);
+        int len = lua_rawlen(L, 2);
         int dims[len];
         for(int i = 0 ; i < len; i++){
-            lua_rawgeti(L, -1, i + 1);
+            lua_rawgeti(L, 2, i + 1);
             dims[i] = luaL_checkinteger(L, -1);
             lua_pop(L, 1);
         }
@@ -411,25 +411,28 @@ static int xffi_harrays_new(lua_State* L){
         return push_ptr_harray(L, arr);
     }break;
     case LUA_TUSERDATA:{
-        if(luaL_testudata(L, -1, __STR(hffi_struct))){
-            luaL_checktype(L, -1, LUA_TTABLE);
-            int len = lua_rawlen(L, -1);
+        if(luaL_testudata(L, 1, __STR(hffi_struct))){
+            luaL_checktype(L, 2, LUA_TTABLE);
+            int len = lua_rawlen(L, 2);
             int dims[len];
             for(int i = 0 ; i < len; i++){
-                lua_rawgeti(L, -1, i + 1);
+                lua_rawgeti(L, 2, i + 1);
                 dims[i] = luaL_checkinteger(L, -1);
                 lua_pop(L, 1);
             }
-            struct hffi_struct* temp = hffi_struct_copy(get_ptr_hffi_struct(L, -2));
-            //not alloc data for every struct. just alloc the total.
-            temp->data = NULL;
-            harray* arr = harray_new_multi_struct(temp, dims, len);
+            int asPtr = lua_gettop(L) > 2 && lua_toboolean(L, 3);
+            struct hffi_struct* temp = hffi_struct_copy(get_ptr_hffi_struct(L, 1));
+            //not alloc data for every struct. just alloc the structure.
+            hffi_struct_free_data(temp);
+            harray* arr = asPtr ? harray_new_multi_struct_ptr(temp, dims, len)
+                                : harray_new_multi_struct(temp, dims, len);
             hffi_delete_struct(temp);
             return push_ptr_harray(L, arr);
         }else{
             return luaL_error(L, "wrong user data of new harrays, only support hffi_struct");
         }
     }break;
+
     default:
         return luaL_error(L, "wrong type of new harrays. type = %d", lua_type(L, -2));
     }
@@ -1092,16 +1095,21 @@ static int __hiff_value_as(lua_State *L){
      if(luaL_testudata(L, 1, __STR(hffi_struct))){
         hffi_struct* hs = get_ptr_hffi_struct(L, 1);
         hffi_struct_set_all(hs, val->ptr);
+        hffi_struct_ref(hs, 1);
+        return push_ptr_hffi_struct(L, hs);
      }else if(luaL_testudata(L, 1, __STR(harray))){
         harray* arr = get_ptr_harray(L, 1);
         harray_set_all(arr, val->ptr);
+        harray_ref(arr, 1);
+        return push_ptr_harray(L, arr);
      }else if(luaL_testudata(L, 1, __STR(hffi_closure))){
-         hffi_closure* arr = get_ptr_hffi_closure(L, 1);
-         hffi_closure_set_func_ptr(arr, val->ptr);
+         hffi_closure* closure = get_ptr_hffi_closure(L, 1);
+         hffi_closure_set_func_ptr(closure, val->ptr);
+         hffi_closure_ref(closure, 1);
+         return push_ptr_hffi_closure(L, closure);
      }else{
          return luaL_error(L, "unsupport data-type of value.as(...)!");
      }
-     return 0;
 }
 static int __hiff_value_add(lua_State *L){
     hffi_value* val = get_ptr_hffi_value(L, lua_upvalueindex(1));
@@ -1282,9 +1290,6 @@ static int xffi_dym_func_gc(lua_State *L){
     return 0;
 }
 
-/** as ffi can't use like this:
-1, create a cif to hold some cif info. and latter to call.
-*/
 static int xffi_dym_func_call(lua_State* L){
     dym_func* func;
     int tab_idx;
@@ -1367,6 +1372,7 @@ static const luaL_Reg g_dym_func_Methods[] = {
 //------------------ dym_lib ----------------------------
 
 static int __dym_lib_func_call(lua_State *L){
+    //func
     lua_pushvalue(L, lua_upvalueindex(1));
     lua_insert(L, 1);
     return xffi_dym_func_call(L);
