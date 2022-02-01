@@ -9,6 +9,28 @@ function m.newHString(str)
 	local _str = str;
 	local pos = 1 -- start with 1
 	local tab_savePos;
+
+	--- return -1, means not found any char. 0 means the first char matches. or else found
+	---
+	function self.skipUntilChar(chars)
+		local tab_chs = {};
+		if( chars and type(chars) == "string" )then
+			for i = 1, #chars do
+				tab_chs[strings.charAt(chars, i)] = true
+			end
+		end
+		local code;
+		local count = -1;
+		for i = pos, #_str do
+			code = strings.charAt(_str, i)
+			if(tab_chs[code]) then
+				count = i - pos;
+				pos = pos + count;
+				break;
+			end
+		end
+		return count;
+	end
 	
 	function self.skipSpace()
 		-- need  '\r\n\t\v\f'?

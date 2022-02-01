@@ -304,7 +304,7 @@ local stru_codec = hffi.struct{
 	pointer, "priv_class";		 -- AVClass *
 	pointer, "profiles";	     -- AVProfile*
 	pointer, "wrapper_name";     -- const char*	
-	pointer, "priv_data_size";	 -- int
+	int, "priv_data_size";	 -- int
 	pointer, "next";			 -- AVCodec* 
 	pointer, "update_thread_context";	-- closure
 	pointer, "defaults";	 -- AVCodecDefault*

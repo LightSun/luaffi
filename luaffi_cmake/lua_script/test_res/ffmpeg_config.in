@@ -1,8 +1,26 @@
 #define FF_API_OLD_OPEN_CALLBACKS 1
 #define FF_API_FORMAT_FILENAME 1
-#define av_format_control_message pointer
 #define FF_API_LAVF_AVCTX 1
 #define FF_API_LAVF_FFSERVER 1
+#define FF_API_PRIVATE_OPT 1
+#define FF_API_OLD_ENCDEC 1
+#define FF_API_CODER_TYPE 1
+#define FF_API_RTP_CALLBACK 1
+#define FF_API_STAT_BITS 1
+#define FF_API_CODED_FRAME 1
+#define FF_API_THREAD_SAFE_CALLBACKS 1
+#define FF_API_VBV_DELAY 1
+#define FF_API_SIDEDATA_ONLY_PKT 1
+#define FF_API_DEBUG_MV 1
+#define FF_API_ASS_TIMING 1
+#define FF_API_PKT_PTS 1
+#define FF_API_ERROR_FRAME 1
+#define FF_API_FRAME_QP 1
+#define FF_API_NEXT 1
+#define FF_API_CONVERGENCE_DURATION 1
+
+#define av_format_control_message pointer
+#define AV_NUM_DATA_POINTERS 8
 
 #define LIBAVFORMAT_VERSION_MAJOR 1
 
@@ -22,3 +40,11 @@ typedef struct AVProbeData {
     int buf_size;       /**< Size of buf except extra allocated bytes */
     const char *mime_type; /**< mime_type, when known. */
 } AVProbeData;
+
+/**
+ * AVProfile.
+ */
+typedef struct AVProfile {
+    int profile;
+    const char *name; ///< short name for the profile
+} AVProfile;

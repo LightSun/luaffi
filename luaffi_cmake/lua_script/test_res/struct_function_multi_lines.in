@@ -1,0 +1,15 @@
+
+struct MultiLine {
+    int (*get_encode_buffer)(struct AVCodecContext *s,
+        AVPacket *pkt,
+        int flags);
+
+    int (*get_encode_buffer2)(struct AVCodecContext *s,
+    AVPacket *pkt, int flags);
+
+    int (*get_encode_buffer3)(
+    struct AVCodecContext *s,
+    AVPacket *pkt,
+    int flags
+    );
+};

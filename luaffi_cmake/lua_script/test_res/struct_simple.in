@@ -1,0 +1,9 @@
+
+
+struct A {
+    int width,height;
+    int* w2, h2;
+    int w3, h3 ;
+    int arr1[4]
+    int arr2[4]
+};

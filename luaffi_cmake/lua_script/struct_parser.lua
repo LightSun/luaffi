@@ -115,9 +115,11 @@ local function newContext(c)
 	local tab_structs = {}	 -- struct names
 	local cur_struct_name;	 -- current struct name
 	local tab_strs = {};	 -- the all strs of struct-defines.
-	local tab_defines;
+	local tab_defines = {};
 	local _work_dir = getWorkDir(); -- the work dir of current parser.
 	local _cur_file; 				  -- the current file to parse
+	local _parsed_files = {};
+	local _local_defines ;  -- the local defines, like 'local _int_8 = hffi.arrays(int, {8})'
 
 	function self.startStruct(name)
 		--print("============ add struct: ", name)
@@ -212,10 +214,45 @@ local function newContext(c)
 		end
 		print("------- Defines end ------")
 	end
+	----------------- local defines. used to avoid redefine ---------
+	function self.isLocalDefined(name)
+		if(_local_defines and _local_defines[name]) then
+			return true;
+		end
+		return nil;
+	end
+	function self.addLocalDefine(name)
+		if(not _local_defines) then
+			_local_defines = {};
+		end
+		_local_defines[name] = true;
+	end
 	------------------------------------
 	function self.setCurrentFile(file_)
+		local targetFile = _work_dir..file_;
+		print("setCurrentFile >>> file_:", file_)
+		print("setCurrentFile >>> targetFile:", targetFile)
+		for i = 1, #_parsed_files do
+			if(_parsed_files[i] == targetFile) then
+				return nil
+			end
+		end
 		_cur_file = file_;
+		table.insert(_parsed_files, targetFile)
+		return true;
 	end
+	function self.isFileParsed(_file)
+		for i = 1, #_parsed_files do
+			if(_parsed_files[i] == _file) then
+				return true
+			end
+		end
+		return nil;
+	end
+	function self.addParsedFile(_filename)
+		table.insert(_parsed_files, _filename)
+	end
+	-----------------------------------------------
 	-- return the file path which can be used for parser
 	function self.filePath(name)
 		if(strings.isAbsolutePath(name)) then
@@ -260,7 +297,8 @@ local function newCtypeInfo(ctx, c)
 		self.baseTypeStr = t
 	end
 
-	function self.processType()
+	function self.processType(target_name)
+		local t_name = target_name or _name;
 		local t = self.baseTypeStr;
 		if (self.hasFlags(INFO_FLAG_UNSIGNED) == true) then
 			local ct = tab_types[t]
@@ -283,11 +321,11 @@ local function newCtypeInfo(ctx, c)
 				self.baseTypeStr = _ctx.getStructObjName(t)..".copy()";
 			end
 			if(_pointerLevel > 0) then
-				_ctx.appendLine(string.format("%s, \"%s\";", "pointer", _name))
+				_ctx.appendLine(string.format("%s, \"%s\";", "pointer", t_name))
 			else
 				local alias = _ctx.get(self.baseTypeStr);
 				local name = alias or self.baseTypeStr;
-				_ctx.appendLine(string.format("%s, \"%s\";", name, _name))
+				_ctx.appendLine(string.format("%s, \"%s\";", name, t_name))
 			end
 		else
 			-- build array desc
@@ -301,6 +339,7 @@ local function newCtypeInfo(ctx, c)
 				end
 			end
 			desc = desc .. "}";
+			local arr_def_name = self.getArrayDefName();
 			--todo currently only support one-level-array. support 2-leve/3level ?
 			if( self.hasFlags(INFO_FLAG_STRUCT) == true) then
 				if _ctx.hasStruct(t) == false then
@@ -308,17 +347,24 @@ local function newCtypeInfo(ctx, c)
 				else
 					-- local arr_frame_data = hffi.array(pointer, AV_NUM_DATA_POINTERS)
 					-- local arr_frame_data = hffi.array({}, {})
-					_ctx.appendLine(string.format("local %s = hffi.arrays(%s, %s);",
-							self.getArrayDefName(), _ctx.getStructObjName(t)..".copy()", desc), true);
+					-- isLocalDefined
+					if(not _ctx.isLocalDefined(arr_def_name)) then
+						_ctx.addLocalDefine(arr_def_name)
+						_ctx.appendLine(string.format("local %s = hffi.arrays(%s, %s);",
+								arr_def_name, _ctx.getStructObjName(t)..".copy()", desc), true);
+					end
 				end
 			else
-				_ctx.appendLine(string.format("local %s = hffi.arrays(%s, %s);",
-						self.getArrayDefName(), self.baseTypeStr, desc), true);
+				if(not _ctx.isLocalDefined(arr_def_name)) then
+					_ctx.addLocalDefine(arr_def_name)
+					_ctx.appendLine(string.format("local %s = hffi.arrays(%s, %s);",
+							arr_def_name, self.baseTypeStr, desc), true);
+				end
 			end
 			if(_pointerLevel > 0) then
-				_ctx.appendLine(string.format("%s, \"%s\";", "pointer", _name))
+				_ctx.appendLine(string.format("%s, \"%s\";", "pointer", t_name))
 			else
-				_ctx.appendLine(string.format("%s, \"%s\";", self.getArrayDefName(), _name))
+				_ctx.appendLine(string.format("%s.copy(), \"%s\";", arr_def_name, t_name))
 			end
 		end
 	end
@@ -521,6 +567,11 @@ local function parseLine(reader, ctx, line, lineNum)
 		-- get file name
 		local filename = ctx.filePath(line.nextQuoteText());
 		print("filename: ", filename)
+		-- already parsed?
+		if(ctx.isFileParsed(filename)) then
+			return nil;
+		end
+		ctx.addParsedFile(filename);
 		local reader0 = file_reader.open(filename)
 		local include_lines = reader0.readLines()
 		reader0.close()
@@ -642,9 +693,25 @@ local function parseLine(reader, ctx, line, lineNum)
 	    name = line.nextWord(")");
 	    info.setBaseTypeStr("pointer")
 	    info.setName(name)
+
+		--
+		line.skipUntilChar("(")
+		line.skip(1) -- '('
+		if( line.skipUntilChar(")") > 0 ) then
+			-- found
+		else
+			-- not found. ')' must be in next lines.
+			while(true) do
+				local line_str = reader.nextLine();
+				line.reset(line_str)
+				if(line.skipUntilChar(")") >= 0 ) then
+					break; -- found.
+				end
+			end
+		end
 	else
 	    info.setPointerLevel(line.nextCharCount("*"))
-	    name = line.nextName(";[");
+	    name = line.nextName(",;[");
 	    info.setName(name)
 
 		print(string.format("after name left: '%s'",line.toString()))
@@ -655,6 +722,20 @@ local function parseLine(reader, ctx, line, lineNum)
 				info.appendArrayElementCount(array_ele_count)
 			else
 				break;
+			end
+		end
+		-- when not array. may be ' int width, height;'
+		if(not array_ele_count or array_ele_count == 0) then
+			print(" >>> not array, check 'int width, height;'.")
+			if( line.skipUntilChar(",") >= 0 ) then
+				-- found
+				line.skip(1) -- skip ','
+				line.skipSpace();
+				name = line.nextName(";[");
+				-- process 'int width, height;'
+				info.processType();
+				info.processType(name)
+				return true;
 			end
 		end
 	end
@@ -668,21 +749,39 @@ local self = {};
 function self.convertStruct(str, _ctx)
 
 	local ctx = _ctx or newContext()
-	ctx.setCurrentFile(str);
+	-- if already parsed ?
+	if( not ctx.setCurrentFile(str) ) then
+		return
+	end
 	--ctx.filePath("abc.in")
 	local reader = file_reader.open(str)
 	reader.stream(function(r, lineNum, line)
 		parseLine(reader, ctx, hstring.newHString(line), lineNum)
 	end)
-	print("-------- convertStruct result ---------- ")
-	ctx.printDefines();
-	print(ctx.outStr())
+	if not _ctx then
+		print("-------- convertStruct result ---------- ")
+		ctx.printDefines();
+		print(ctx.outStr())
+	end
 end
 
 --self.convertStruct("test_res/struct1.in")
 --self.convertStruct("test_res/struct_if.in")
 
 --self.convertStruct("test_res/ffmpeg.in")
-self.convertStruct("test_res/ffmpeg_avstream.in")
+--self.convertStruct("test_res/ffmpeg_avstream.in")
+--self.convertStruct("test_res/struct_func_multi_lines.in")
+self.convertStruct("test_res/struct_simple.in")
+
+local function test_ffmpeg()
+	local ctx = newContext()
+	self.convertStruct("test_res/ffmpeg_avcodec.in", ctx)
+	self.convertStruct("test_res/ffmpeg_avcodec_ctx.in", ctx)
+
+	print("-------- convertStruct result ---------- ")
+	ctx.printDefines();
+	print(ctx.outStr())
+end
+--test_ffmpeg();
 
 return self;

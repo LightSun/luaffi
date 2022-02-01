@@ -1,3 +1,11 @@
+
+local function check_ptr(val, msg)
+    if not val.hasData() then
+        print(msg)
+        os.exit(1)
+    end
+end
+
 hffi.defines();
 local ffmpeg_structs = require("ffmpeg_structs")
 
@@ -74,4 +82,29 @@ if(pCodec==NULL){
     LOGE("Couldn't find Codec.\n");
 return -1;
 }]]
-local pCodecCtx = strams[videoindex].as(temp_avcodec_ctx);
+local pCodecCtx = strams[videoindex].codec.as(temp_avcodec_ctx);
+local _pCodec = avcodec.avcodec_find_decoder{ret =  hffi.valuePtr(void), pCodecCtx.codec_id}
+check_ptr(_pCodec, "avcodec_find_decoder() failed.");
+--local pCodec = _pCodec.as(ffmpeg_structs.avcodec)
+if(avcodec.avcodec_open2{ret = hffi.value(int), pCodecCtx.valuePtr(), _pCodec, nil}.get() < 0)then
+    print("Couldn't open codec.\n");
+    os.exit(1);
+end
+
+--[[
+pFrame=av_frame_alloc();
+pFrameYUV=av_frame_alloc();
+out_buffer=(unsigned char *)av_malloc(av_image_get_buffer_size(AV_PIX_FMT_YUV420P,  pCodecCtx->width, pCodecCtx->height,1));
+av_image_fill_arrays(pFrameYUV->data, pFrameYUV->linesize,out_buffer,
+AV_PIX_FMT_YUV420P,pCodecCtx->width, pCodecCtx->height,1);
+]]
+local AV_PIX_FMT_YUV420P = 0;
+local pFrame = avcodec.av_frame_alloc{ ret = hffi.valuePtr(void) }
+local pFrameYUV = avcodec.av_frame_alloc{ret = hffi.valuePtr(void) }
+check_ptr(pFrameYUV, "av_frame_alloc() failed.");
+local _buf_size = avcodec.av_image_get_buffer_size{ret = hffi.value(int), hffi.value(int, AV_PIX_FMT_YUV420P), pCodecCtx.width, pCodecCtx.height, hffi.value(int, 1)}
+local out_buffer = avcodec.av_malloc{ret = hffi.valuePtr(void),  _buf_size }
+
+--
+local stru_pFrameYUV = pFrameYUV.as(ffmpeg_structs.avframe)
+avcodec.av_image_fill_arrays{stru_pFrameYUV.data, }
