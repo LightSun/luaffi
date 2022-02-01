@@ -230,8 +230,8 @@ local function newContext(c)
 	------------------------------------
 	function self.setCurrentFile(file_)
 		local targetFile = _work_dir..file_;
-		print("setCurrentFile >>> file_:", file_)
-		print("setCurrentFile >>> targetFile:", targetFile)
+		--print("setCurrentFile >>> file_:", file_)
+		--print("setCurrentFile >>> targetFile:", targetFile)
 		for i = 1, #_parsed_files do
 			if(_parsed_files[i] == targetFile) then
 				return nil
@@ -300,18 +300,26 @@ local function newCtypeInfo(ctx, c)
 	function self.processType(target_name)
 		local t_name = target_name or _name;
 		local t = self.baseTypeStr;
+		-- process default . like 'signed age;' or 'unsigned age;'
+		if(not t) then
+			if (self.hasFlags(INFO_FLAG_UNSIGNED) == true or self.hasFlags(INFO_FLAG_SIGNED) == true) then
+				self.baseTypeStr = "int";
+				t = "int";
+			end
+		end
+
 		if (self.hasFlags(INFO_FLAG_UNSIGNED) == true) then
 			local ct = tab_types[t]
 			if ct then
 				self.baseTypeStr = ct;
 				print(string.format("setBaseTypeStr >>> cast unsigned type. from %s to %s", t, ct))
 			end
-		elseif (self.hasFlags(INFO_FLAG_ENUM) == true) then
+		elseif (self.hasFlags(INFO_FLAG_ENUM) == true and t ~= 'pointer') then
 			self.baseTypeStr = "int"; -- for c . enum default int.
 		end
 		-- check array
 		if(#tab_array_count == 0) then
-			if( self.hasFlags(INFO_FLAG_STRUCT) == true )then
+			if( self.hasFlags(INFO_FLAG_STRUCT) == true and t ~= 'pointer')then
 				if _ctx.hasStruct(t) == false then
 					error(string.format("you must parse struct '%s' before %s.", t, _ctx.getCurStructName()))
 				else
@@ -339,9 +347,14 @@ local function newCtypeInfo(ctx, c)
 				end
 			end
 			desc = desc .. "}";
+			-- check pointer type
+			if(_pointerLevel > 0) then
+				self.baseTypeStr = "pointer";
+			end
+
 			local arr_def_name = self.getArrayDefName();
 			--todo currently only support one-level-array. support 2-leve/3level ?
-			if( self.hasFlags(INFO_FLAG_STRUCT) == true) then
+			if( self.hasFlags(INFO_FLAG_STRUCT) == true and _pointerLevel == 0) then
 				if _ctx.hasStruct(t) == false then
 					error(string.format("you must parse struct '%s' before %s.", t, _ctx.getCurStructName()))
 				else
@@ -361,11 +374,7 @@ local function newCtypeInfo(ctx, c)
 							arr_def_name, self.baseTypeStr, desc), true);
 				end
 			end
-			if(_pointerLevel > 0) then
-				_ctx.appendLine(string.format("%s, \"%s\";", "pointer", t_name))
-			else
-				_ctx.appendLine(string.format("%s.copy(), \"%s\";", arr_def_name, t_name))
-			end
+			_ctx.appendLine(string.format("%s.copy(), \"%s\";", arr_def_name, t_name))
 		end
 	end
     function self.appendArrayElementCount(count)
@@ -550,7 +559,11 @@ local function parseLine(reader, ctx, line, lineNum)
 	-- handle 'typedef struct AVCodecContext {' and '}'
 	line.skipSpace();
 	if line.startsWith("attribute_deprecated") then
-		return nil;
+		line.skipText()
+		line.skipSpace()
+		if(line.isEnd()) then
+			return nil;
+		end
 	end
 	--todo  support '// and /*.../'
 	if line.startsWith("/") or line.startsWith("*") then
@@ -662,11 +675,35 @@ local function parseLine(reader, ctx, line, lineNum)
 	elseif (baseTypeStr == "signed") then
 		info.addFlags(INFO_FLAG_SIGNED)
 		line.skipSpace();
-		baseTypeStr = line.nextWord("*");
+		baseTypeStr = line.nextWord(";*");
+		-- check may be 'signed age;'
+		line.save();
+		line.skipSpace()
+		if(line.startsWith(";")) then
+			-- no assigned type. default is int in 'C'.
+			info.setBaseTypeStr("int")
+			info.setName(baseTypeStr)
+			info.processType()
+			return true;
+		else
+			line.restore();
+		end
 	elseif (baseTypeStr == "unsigned") then
 		info.addFlags(INFO_FLAG_UNSIGNED)
 		line.skipSpace();
-		baseTypeStr = line.nextWord("*");
+		baseTypeStr = line.nextWord(";*");
+		-- check may be 'unsigned age;'
+		line.save();
+		line.skipSpace()
+		if(line.startsWith(";")) then
+			-- no assigned type. default is int in 'C'.
+			info.setBaseTypeStr("int")
+			info.setName(baseTypeStr)
+			info.processType()
+			return true;
+		else
+			line.restore();
+		end
 	end
 	if DEBUG then
 		print("before check * >>>  baseTypeStr = ", baseTypeStr)
@@ -709,12 +746,15 @@ local function parseLine(reader, ctx, line, lineNum)
 				end
 			end
 		end
+		-- for function pointer we should remove flags of enum and struct.
+		-- eg: enum AVPixelFormat (*get_format)(struct AVCodecContext *s, const enum AVPixelFormat * fmt);
 	else
 	    info.setPointerLevel(line.nextCharCount("*"))
 	    name = line.nextName(",;[");
 	    info.setName(name)
-
-		print(string.format("after name left: '%s'",line.toString()))
+		if(DEBUG) then
+			print(string.format("after name left: '%s'",line.toString()))
+		end
 		local array_ele_count;
 		while(true) do
 			array_ele_count = line.nextArrayElementCount(ctx); -- [i]
@@ -723,6 +763,18 @@ local function parseLine(reader, ctx, line, lineNum)
 			else
 				break;
 			end
+		end
+		-- skip ';'
+		if(line.startsWith(";")) then
+			info.processType();
+			return true
+		end
+		-- may have '//xxx.xxx'
+		--todo handle '/* ... */'
+		line.skipSpace()
+		if(line.startsWith("//")) then
+			info.processType();
+			return true
 		end
 		-- when not array. may be ' int width, height;'
 		if(not array_ele_count or array_ele_count == 0) then
@@ -771,17 +823,19 @@ end
 --self.convertStruct("test_res/ffmpeg.in")
 --self.convertStruct("test_res/ffmpeg_avstream.in")
 --self.convertStruct("test_res/struct_func_multi_lines.in")
-self.convertStruct("test_res/struct_simple.in")
+--self.convertStruct("test_res/struct_simple.in")
 
 local function test_ffmpeg()
 	local ctx = newContext()
 	self.convertStruct("test_res/ffmpeg_avcodec.in", ctx)
 	self.convertStruct("test_res/ffmpeg_avcodec_ctx.in", ctx)
+	self.convertStruct("test_res/ffmpeg_avformat_ctx.in", ctx)
+	self.convertStruct("test_res/ffmpeg_avframe.in", ctx)
 
 	print("-------- convertStruct result ---------- ")
 	ctx.printDefines();
 	print(ctx.outStr())
 end
---test_ffmpeg();
+test_ffmpeg();
 
 return self;

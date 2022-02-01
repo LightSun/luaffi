@@ -18,11 +18,24 @@
 #define FF_API_FRAME_QP 1
 #define FF_API_NEXT 1
 #define FF_API_CONVERGENCE_DURATION 1
+#define FF_API_BUFFER_SIZE_T 1
 
 #define av_format_control_message pointer
 #define AV_NUM_DATA_POINTERS 8
 
 #define LIBAVFORMAT_VERSION_MAJOR 1
+
+//self define. by heaven7. indicate alloc data and free self.
+#define HAS_DATA_AVIOInterruptCB 1
+#define FREE_DATA_AVIOInterruptCB 1
+#define HAS_DATA_AVRational 1
+#define FREE_DATA_AVRational 1
+#define HAS_DATA_AVProbeData 1
+#define FREE_DATA_AVProbeData 1
+#define HAS_DATA_AVProfile 1
+#define FREE_DATA_AVProfile 1
+#define HAS_DATA_AVBufferRef 1
+#define FREE_DATA_AVBufferRef 1
 
 typedef struct AVIOInterruptCB {
     int (*callback)(void*);
@@ -48,3 +61,22 @@ typedef struct AVProfile {
     int profile;
     const char *name; ///< short name for the profile
 } AVProfile;
+
+typedef struct AVBufferRef {
+    AVBuffer *buffer;
+
+    /**
+     * The data buffer. It is considered writable if and only if
+     * this is the only reference to the buffer, in which case
+     * av_buffer_is_writable() returns 1.
+     */
+    uint8_t *data;
+    /**
+     * Size of data in bytes.
+     */
+#if FF_API_BUFFER_SIZE_T
+    int      size;
+#else
+    size_t   size;
+#endif
+} AVBufferRef;

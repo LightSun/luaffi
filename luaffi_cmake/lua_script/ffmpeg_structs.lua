@@ -82,6 +82,7 @@ local stru_context = hffi.struct({
     int, "brd_scale";
     int, "keyint_min";
     int, "refs";
+    int, "chromaoffset";
     int, "mv0_threshold";
     int, "b_sensitivity";
     int, "color_primaries"; -- enum
@@ -198,7 +199,7 @@ local stru_context = hffi.struct({
 
     pointer, "dump_separator";
     pointer, "codec_whitelist";
-    int, "properties"; --unsigned
+    uint32, "properties"; --unsigned
 	pointer, "coded_side_data";
     int, "nb_coded_side_data";
     pointer, "hw_frames_ctx";

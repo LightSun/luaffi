@@ -293,6 +293,9 @@ function m.newHString(str)
 		return txt;
 	end
 	--------------------------
+	function self.isEnd()
+		return pos == #_str;
+	end
 	
 	function self.save()
 		if not tab_savePos then
