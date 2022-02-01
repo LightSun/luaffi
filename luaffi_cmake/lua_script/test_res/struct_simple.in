@@ -1,4 +1,5 @@
 
+#define FF_API_BUFFER_SIZE_T 1
 
 struct A {
     int width,height;
@@ -10,4 +11,10 @@ struct A {
         struct AVCodecContext *s, const enum AVPixelFormat * fmt);
 
    AVBufferRef *buf[8];
+
+#if FF_API_BUFFER_SIZE_T
+   int      size;
+#else
+   size_t   size;
+#endif
 };

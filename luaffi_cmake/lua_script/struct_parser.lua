@@ -508,10 +508,8 @@ local function handle_ifelse_expre(ctx, hs_line, reader)
 	-- handle blocks
 	for i = 1, #blocks do
 		bi = blocks[i]
-		-- if not exist
-		if(not bi.getExpre())then
+		-- if 'bi.getExpre() = nil'
 
-		end
 		if(DEBUG) then
 			if(bi.getType() == BLOCK_TYPE_IF) then
 				print("start handle:  if block =", bi.getExpre(), #bi.getLines())
@@ -524,7 +522,7 @@ local function handle_ifelse_expre(ctx, hs_line, reader)
 		-- else
 		if	bi.getType() == BLOCK_TYPE_ELSE then
 			print("find valid else: ", bi.getExpre())
-			reader.appendLines(bi.getLines());
+			reader.appendLines(bi.getLines(), true);
 			return;
 		end
 		-- if/elseif
@@ -534,12 +532,12 @@ local function handle_ifelse_expre(ctx, hs_line, reader)
 			for j = 1, #bi.getLines() do
 				print("__line="..bi.getLines()[j])
 			end
-			reader.appendLines(bi.getLines());
+			reader.appendLines(bi.getLines(), true);
 			return;
 		end
 		if(ctx.defined(bi.getExpre()) and ctx.get(bi.getExpre()) ~= 0) then
 			print("find valid expre: ", bi.getExpre())
-			reader.appendLines(bi.getLines());
+			reader.appendLines(bi.getLines(), true);
 			return;
 		end
 	end
@@ -824,18 +822,19 @@ end
 --self.convertStruct("test_res/ffmpeg_avstream.in")
 --self.convertStruct("test_res/struct_func_multi_lines.in")
 --self.convertStruct("test_res/struct_simple.in")
+self.convertStruct("test_res/struct_simple2.in")
 
 local function test_ffmpeg()
 	local ctx = newContext()
 	self.convertStruct("test_res/ffmpeg_avcodec.in", ctx)
-	self.convertStruct("test_res/ffmpeg_avcodec_ctx.in", ctx)
-	self.convertStruct("test_res/ffmpeg_avformat_ctx.in", ctx)
+	--self.convertStruct("test_res/ffmpeg_avcodec_ctx.in", ctx)
+	--self.convertStruct("test_res/ffmpeg_avformat_ctx.in", ctx)
 	self.convertStruct("test_res/ffmpeg_avframe.in", ctx)
 
 	print("-------- convertStruct result ---------- ")
 	ctx.printDefines();
 	print(ctx.outStr())
 end
-test_ffmpeg();
+--test_ffmpeg();
 
 return self;

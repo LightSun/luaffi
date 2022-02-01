@@ -7,6 +7,7 @@ function m.open(file_in)
     local file;
     local m_lineNum = 1;
     local tab_lines;
+    local tab_high_priority_lines;
    -- local tab_insert_files;
    -- local tab_insert_lines; -- <k,v> key = file, value = tab_lines
 
@@ -40,17 +41,39 @@ function m.open(file_in)
         return lines;
     end
 
-    function self.appendLine(line)
+    function self.appendLine(line, high_priority)
+        -- check if high_priority
+        if(high_priority) then
+            if not tab_high_priority_lines then
+                tab_high_priority_lines = {};
+            end
+            table.insert(tab_high_priority_lines, line);
+            return
+        end
+        -- normal
         if not tab_lines then
             tab_lines = {};
         end
         table.insert(tab_lines, line);
     end
 
-    function self.appendLines(lines)
+    function self.appendLines(lines, high_priority)
         if #lines == 0 then
             return
         end
+        -- check if high priority
+        if(high_priority) then
+            if not tab_high_priority_lines then
+                tab_high_priority_lines = {};
+            end
+            -- `a2[t]`,`··· = a1[f]`,`···,a1[e]`.
+            -- table.move(a1, f, e, t, a2)
+            local old_size = #tab_high_priority_lines
+            table.move(lines, 1, #lines, #tab_high_priority_lines + 1, tab_high_priority_lines);
+            assert(#tab_high_priority_lines == (old_size + #lines))
+            return
+        end
+        -- normal
         if not tab_lines then
             tab_lines = {};
         end
@@ -67,6 +90,12 @@ function m.open(file_in)
     function self.nextLine()
         -- when line is append from outside. we may lineNum not changed.
         -- print("----------------- next line -----------")
+
+        -- if high_priority
+        if(tab_high_priority_lines and #tab_high_priority_lines > 0) then
+            return table.remove(tab_high_priority_lines, 1);
+        end
+        -- normal
         if tab_lines and #tab_lines > 0 then
             return table.remove(tab_lines, 1);
         end

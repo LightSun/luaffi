@@ -1,0 +1,20 @@
+#include "struct_simple.in"
+
+typedef struct AVBufferRef {
+    AVBuffer *buffer;
+
+    /**
+     * The data buffer. It is considered writable if and only if
+     * this is the only reference to the buffer, in which case
+     * av_buffer_is_writable() returns 1.
+     */
+    uint8_t *data;
+    /**
+     * Size of data in bytes.
+     */
+#if FF_API_BUFFER_SIZE_T
+    int      size;
+#else
+    size_t   size;
+#endif
+} AVBufferRef;
