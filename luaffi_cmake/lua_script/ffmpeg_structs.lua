@@ -456,7 +456,7 @@ local _AVStream = hffi.struct({
     _AVRational.copy(), "sample_aspect_ratio";
     pointer, "metadata";
     _AVRational.copy(), "avg_frame_rate";
-    AVPacket, "attached_pic";
+    stru_pkt.ensureData().copy(), "attached_pic";--should ensure data
     pointer, "side_data";
     int, "nb_side_data";
     int, "event_flags";
@@ -477,7 +477,6 @@ local _AVStream = hffi.struct({
     _AVProbeData.copy(), "unused6";
     _int64_t_17, "unused5";
     pointer, "index_entries";
-    support, "seeking";
     int, "nb_index_entries";
     uint32, "index_entries_allocated_size";
     int, "stream_identifier";

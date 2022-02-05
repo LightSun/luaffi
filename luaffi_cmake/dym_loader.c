@@ -108,6 +108,7 @@ dym_lib* dym_new_lib2(const char* dir,const char* libname){
     #ifdef _WIN32
         if(!lib && dir){
             char buf[__DYM_BUF_LEN];
+            snprintf(buf, __DYM_BUF_LEN, LIB_FORMAT_1, libname);
             char* ret = strstr(libname, ".dll");
             int endWithDll = ret != NULL && strlen(ret) == 4;
             TCHAR chCurDir[MAX_PATH] = {0};

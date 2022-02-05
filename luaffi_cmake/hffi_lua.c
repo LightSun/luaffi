@@ -71,6 +71,7 @@ static const BasePair _BASE_PAIRS[] = {
     {"long", HFFI_TYPE_SINT64},
     {"int", HFFI_TYPE_INT},
     //
+    {"char", HFFI_TYPE_SINT8},
     {"uint", HFFI_TYPE_UINT32},
     {"size_t", HFFI_TYPE_UINT32},
     {"int64_t", HFFI_TYPE_SINT64},
@@ -281,6 +282,12 @@ static int __harray_func_hasData(lua_State* L){
     lua_pushboolean(L, arr->data != NULL);
     return 1;
 }
+static int __harray_func_ensureData(lua_State* L){
+    harray* arr = get_ptr_harray(L, lua_upvalueindex(1));
+    harray_ensure_data(arr);
+    harray_ref(arr, 1);
+    return push_ptr_harray(L, arr);
+}
 static int __harray_func_offsetPtrValue(lua_State* L){
     harray* arr = get_ptr_harray(L, lua_upvalueindex(1));
     int offset = luaL_checkinteger(L, 1);
@@ -296,6 +303,7 @@ static int __harray_func_offsetPtrValue(lua_State* L){
 static const luaL_Reg g_harray_str_Methods[] = {
     {"set", __harray_func_set},
     {"hasData", __harray_func_hasData},
+    {"ensureData", __harray_func_ensureData},
     {"addr", __harray_func_addr},
     {"copy", __harray_func_copy},
     {"eletype", __harray_func_eletype},
@@ -721,12 +729,20 @@ static int __struct_ptrValue(lua_State *L){
     }
     return push_ptr_hffi_value(L, val);
 }
+static int _struct_ensureData(lua_State *L){
+    hffi_struct* hs = get_ptr_hffi_struct(L, lua_upvalueindex(1));
+    hffi_struct_ensure_data(hs);
+    hffi_struct_ref(hs, 1);
+    return push_ptr_hffi_struct(L, hs);
+}
+
 static int xffi_struct_index(lua_State *L){
     hffi_struct* hs = get_ptr_hffi_struct(L, 1);
     if(lua_type(L, 2) == LUA_TSTRING){
         const char* fun_name = lua_tostring(L, 2);
         __INDEX_METHOD("copy", __struct_copy)
         __INDEX_METHOD("hasData", __struct_hasData)
+        __INDEX_METHOD("ensureData", _struct_ensureData)
         __INDEX_METHOD("getMembertype", __struct_memberType)
         __INDEX_METHOD("getOffsets", __struct_getOffsets)
         __INDEX_METHOD("getTypeSize", __struct_typeSize)

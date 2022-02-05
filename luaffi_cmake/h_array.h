@@ -72,6 +72,7 @@ harray* harray_new_chars2(const char* str, int len);
 //free_data: true to free data on recycle.
 harray* harray_new_from_data(sint8 hffi_t, void* data, int data_size, int ele_count, sint8 free_data);
 
+void harray_ensure_data(harray* str);
 harray* harray_copy(harray* src);
 void harray_delete(harray* arr);
 

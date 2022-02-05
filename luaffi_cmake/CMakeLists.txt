@@ -102,7 +102,7 @@ add_executable(luaffi_app
     )
 
 #target_link_libraries(ffi2 lua ${ffi_libs})
-target_link_libraries(luaffi_app ffi2 lua ${Sys_lib})
+target_link_libraries(luaffi_app ffi lua ${Sys_lib})
 if(gTest_enabled)
     target_link_libraries(luaffi_app ${gTest_libs})
 endif()

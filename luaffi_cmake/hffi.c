@@ -1170,6 +1170,9 @@ static inline hffi_struct* hffi_new_struct_from_list0(int abi,struct array_list*
                 tmp_struct = (hffi_struct*)tmp_smtype->_ptr;
                 atomic_add(&tmp_struct->ref, 1);
                 tmp_type = tmp_struct->type;
+                //ensure data
+                hffi_struct_ensure_data(tmp_struct);
+                //add to child
                 array_list_add(children, __new_struct_item(i, HFFI_TYPE_STRUCT, _ITEM_COPY_DATA, tmp_struct));
             }else{
                 //create sub struct. latter will set data-memory-pointer
@@ -1191,6 +1194,8 @@ static inline hffi_struct* hffi_new_struct_from_list0(int abi,struct array_list*
                     goto failed;
                 }
                 atomic_add(&tmp_harr->ref, 1);
+                //ensure data
+                harray_ensure_data(tmp_harr);
                 array_list_add(children, __new_struct_item(i, HFFI_TYPE_HARRAY, _ITEM_COPY_DATA, tmp_harr));
             }else{
                 //harray must be set first.
@@ -1664,6 +1669,14 @@ harray* hffi_struct_get_as_array(hffi_struct* hs, int index, sint8 type,int rows
     void* data_ptr = hs->data + offsets[index];
 
     return hffi_get_pointer_as_array_impl(type, data_ptr, rows, cols, continue_mem, share_memory);
+}
+
+void hffi_struct_ensure_data(struct hffi_struct* hs){
+    if(!hs->data){
+        hs->data = MALLOC(hs->data_size);
+        hs->should_free_data = 1;
+        __struct_set_children_data(hs);
+    }
 }
 
 int hffi_struct_set_all(struct hffi_struct* hs, void* ptr){

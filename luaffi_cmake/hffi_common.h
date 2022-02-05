@@ -229,6 +229,8 @@ void hffi_struct_free_data(struct hffi_struct* c);
 void hffi_struct_ref(struct hffi_struct* c, int ref_count);
 
 int hffi_struct_set_all(struct hffi_struct* c, void* ptr);
+/** ensure data not null.*/
+void hffi_struct_ensure_data(struct hffi_struct* c);
 
 struct hffi_struct* hffi_struct_copy(struct hffi_struct* src);
 int hffi_struct_eq(struct hffi_struct* hs1, struct hffi_struct* hs2);

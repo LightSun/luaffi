@@ -590,7 +590,7 @@ local function parseLine(reader, ctx, line, lineNum)
 		return nil;
 	end
 
-	-- handle #define
+	-- handle '#define'
 	if(line.startsWith("#define")) then
 		line.skipText();
 		line.skipSpace()
@@ -822,7 +822,7 @@ end
 --self.convertStruct("test_res/ffmpeg_avstream.in")
 --self.convertStruct("test_res/struct_func_multi_lines.in")
 --self.convertStruct("test_res/struct_simple.in")
-self.convertStruct("test_res/struct_simple2.in")
+--self.convertStruct("test_res/struct_simple2.in")
 
 local function test_ffmpeg()
 	local ctx = newContext()
@@ -835,6 +835,6 @@ local function test_ffmpeg()
 	ctx.printDefines();
 	print(ctx.outStr())
 end
---test_ffmpeg();
+test_ffmpeg();
 
 return self;

@@ -369,6 +369,12 @@ harray* harray_new_from_data(sint8 hffi_t, void* data, int data_size, int ele_co
     }
     return arr;
 }
+void harray_ensure_data(harray* src){
+    if(!src->data){
+        src->data = MALLOC(src->data_size);
+        src->free_data = 1;
+    }
+}
 harray* harray_copy(harray* src){
     harray* arr = MALLOC( sizeof (harray));
     arr->parent = NULL;
